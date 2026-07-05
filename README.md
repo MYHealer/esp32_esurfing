@@ -107,7 +107,7 @@ esptool --port COM14 --baud 460800 write_flash ^
 
 1. 开发板上电后，手机搜索 WiFi `ESurfing-Config`（无密码）
 2. 连接后浏览器打开 `http://192.168.4.1`
-3. 填写校园网 WiFi 名称、密码，校园网账号密码，点击保存
+3. 填写 2.4g WiFi 名称、密码，校园网账号密码，点击保存
 4. 设备自动重启并开始认证
 
 ## 自行构建
@@ -259,7 +259,7 @@ Load Mode 选择 **UART**，点击 **OK**。
 
 | 字段 | 说明 | 示例 |
 |------|------|------|
-| WiFi SSID | 校园网 WiFi 名称 | `ChinaNet` |
+| WiFi SSID | 2.4g WiFi 名称 | `ChinaNet` |
 | WiFi 密码 | 校园网 WiFi 密码 | 可留空 |
 | 用户名 | 校园网账号 | 学号或手机号 |
 | 密码 | 校园网密码 |  |

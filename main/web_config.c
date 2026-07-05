@@ -145,7 +145,7 @@ static esp_err_t root_get_handler(httpd_req_t* req)
         "%s"
         "<div class='card'><h2>WiFi 设置</h2>"
         "<form id='config' action='/save' method='POST'>"
-        "<label>WiFi SSID</label><input name='wifi_ssid' value='%s' placeholder='校园网 WiFi 名称'>"
+        "<label>WiFi SSID</label><input name='wifi_ssid' value='%s' placeholder='2.4g WiFi 名称'>"
         "<label>WiFi 密码</label><input name='wifi_password' type='password' value='%s' placeholder='WiFi 密码（留空为开放网络）'>"
         "<hr><h2>校园网账号</h2>"
         "<label>用户名</label><input name='campus_username' value='%s' placeholder='学号/手机号'>"

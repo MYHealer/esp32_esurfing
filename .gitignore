@@ -1,4 +1,5 @@
 build/
+build_dist/
 sdkconfig
 sdkconfig.old
 .claude/
@@ -12,3 +13,12 @@ __pycache__/
 *.obj
 *.elf
 *.map
+dist/
+*.zip
+*.supermini
+*.bak
+.env.sh
+
+release/
+dist/
+build_dist/

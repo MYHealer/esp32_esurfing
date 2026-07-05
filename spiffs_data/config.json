@@ -1,7 +1,7 @@
 {
-    "wifi_ssid": "your_wifi_ssid",
-    "wifi_password": "your_wifi_password",
-    "campus_username": "your_username",
-    "campus_password": "your_password",
+    "wifi_ssid": "",
+    "wifi_password": "",
+    "campus_username": "",
+    "campus_password": "",
     "channel": "phone"
 }

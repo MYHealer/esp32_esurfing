@@ -1,12 +1,12 @@
 # ESP32 ESurfing — 天翼校园网自动认证客户端
 
-> 基于 [ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion) 移植到 ESP32-C3 的校园网自动认证工具。
+> 基于 [ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion) 移植到 ESP32系列 的校园网自动认证工具。
 
 ## 适用人群
 
 - **在校大学生** — 使用中国电信天翼校园网的宿舍用户
 - **需要自动认证** — 路由器不方便刷机/不想折腾 OpenWrt，用 ESP32 旁路认证
-- **ESP32-C3 玩家** — 手上有 ESP32-C3 SuperMini 或其他 ESP32-C3 开发板
+- **ESP32系列玩家** — 手上有 ESP32-C3 SuperMini 或其他 ESP32 开发板
 
 ## 功能
 

@@ -3,8 +3,8 @@
    "log_lv": 4,
    "accounts": [
        {
-           "username": "3123002626",
-           "password": "03157733",
+           "username": "your_username",
+           "password": "your_password",
            "channel": "phone",
            "mark": ""
        }

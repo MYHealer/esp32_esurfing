@@ -51,12 +51,29 @@
 
 ## 硬件要求
 
-| 组件 | 推荐型号 |
-|------|---------|
-| **开发板** | ESP32-C3 SuperMini（或其他 ESP32-C3） |
-| **Flash** | 4MB |
-| **USB 线** | 数据线（非充电线） |
-| **供电** | 5V USB 充电器（插电运行） |
+| 组件 | 推荐型号 | 说明 |
+|------|---------|------|
+| **开发板** | ESP32-C3 / ESP32-S3 / ESP32 | 4MB Flash |
+| **测试适配** | ESP32-C3 SuperMini | 已降功率适配 PCB 天线 |
+| **USB 线** | 数据线 | 充电线无法烧录 |
+| **供电** | 5V USB 充电器 | 插电运行，功耗约 0.3W |
+
+> 已编译固件可在 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载，支持以下芯片：
+> - `ESP32-C3_SuperMini` — 降功率版
+> - `ESP32-C3` — 标准版
+> - `ESP32-S3` — 双核 Xtensa
+> - `ESP32` — 经典双核
+
+## 快速开始
+
+### 1. 下载固件
+
+从 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载对应你芯片的 `XXX_v1.0.0.zip` 包，解压后包含：
+
+- `bootloader.bin` — 引导程序
+- `partition-table.bin` — 分区表
+- `esp32_esurfing.bin` — 应用程序
+- `spiffs.bin` — 配置文件分区 |
 
 > 其他 ESP32 系列（如 ESP32、ESP32-S3）也可用，需修改 sdkconfig 中的工具链配置。
 

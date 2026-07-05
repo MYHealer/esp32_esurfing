@@ -1,7 +1,7 @@
 {
-    "wifi_ssid": "No Study Come Play1",
-    "wifi_password": "1234567890",
-    "campus_username": "3123002626",
-    "campus_password": "03157733",
+    "wifi_ssid": "your_wifi_ssid",
+    "wifi_password": "your_wifi_password",
+    "campus_username": "your_username",
+    "campus_password": "your_password",
     "channel": "phone"
 }

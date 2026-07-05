@@ -49,33 +49,35 @@
 └─────────────────────────────────────────────────┘
 ```
 
-## 硬件要求
+## 支持的开发板
 
-| 组件 | 推荐型号 | 说明 |
-|------|---------|------|
-| **开发板** | ESP32-C3 / ESP32-S3 / ESP32 | 4MB Flash |
-| **测试适配** | ESP32-C3 SuperMini | 已降功率适配 PCB 天线 |
-| **USB 线** | 数据线 | 充电线无法烧录 |
-| **供电** | 5V USB 充电器 | 插电运行，功耗约 0.3W |
+本项目已编译固件适配以下芯片，覆盖市面上绝大多数 ESP32 开发板：
 
-> 已编译固件可在 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载，支持以下芯片：
-> - `ESP32-C3_SuperMini` — 降功率版
-> - `ESP32-C3` — 标准版
-> - `ESP32-S3` — 双核 Xtensa
-> - `ESP32` — 经典双核
+| 芯片 | 常见开发板 | 架构 | 特点 |
+|------|-----------|------|------|
+| **ESP32** | ESP32-DevKitC, NodeMCU-32S, ESP-WROOM-32 | Xtensa 双核 | 最经典，市场保有量最大 |
+| **ESP32-S3** | ESP32-S3-DevKitC-1, S3-Box, T-Display-S3 | Xtensa 双核 | USB-OTG, 大 RAM, AI 加速 |
+| **ESP32-C3** | ESP32-C3-DevKitC-02, C3 SuperMini | RISC-V 单核 | 低成本, RISC-V 架构 |
+| **ESP32-S2** | ESP32-S2-Saola-1, S2-Mini | Xtensa 单核 | 原生 USB, 无蓝牙 |
+| **ESP32-C3 SuperMini** | C3 SuperMini 专用版 | RISC-V 单核 | 已降功率适配 PCB 天线 |
+
+> 所有版本均需要 **4MB Flash**。不支持 2MB Flash 的 ESP32-C2 芯片。
+> 
+> 固件可在 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载，选择对应芯片的 zip 包。
 
 ## 快速开始
 
 ### 1. 下载固件
 
-从 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载对应你芯片的 `XXX_v1.0.0.zip` 包，解压后包含：
+从 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载对应芯片的 `XXX_v1.0.0.zip` 包。
 
+每个 zip 包含：
 - `bootloader.bin` — 引导程序
 - `partition-table.bin` — 分区表
 - `esp32_esurfing.bin` — 应用程序
-- `spiffs.bin` — 配置文件分区 |
-
-> 其他 ESP32 系列（如 ESP32、ESP32-S3）也可用，需修改 sdkconfig 中的工具链配置。
+- `spiffs.bin` — 配置文件分区
+- `flash_guide.txt` — 该芯片的烧录参数
+- `README.md` — 完整说明
 
 ## 快速开始
 
@@ -154,44 +156,52 @@ python -m esptool --port COM14 --baud 460800 write_flash ^
 
 ### 准备工作
 
-1. 下载并安装 [Flash Download Tool](https://www.espressif.com/en/support/download/other-tools)（ESP32 版本）
-2. 下载固件文件（从 Releases 或自行构建）：
-   - `bootloader.bin` — 引导程序（21KB）
-   - `partition-table.bin` — 分区表（3KB）
-   - `esp32_esurfing.bin` — 应用程序（1041KB）
-   - `spiffs.bin` — SPIFFS 配置分区（1216KB）
-3. 使用 USB 数据线连接 ESP32-C3 SuperMini 到电脑
+1. 下载并安装 [Flash Download Tool](https://www.espressif.com/en/support/download/other-tools)（**ESP32 Flash Download Tool** 版本）
+2. 下载对应芯片的 `XXX_v1.0.0.zip` 并解压，固件包含：
+   - `bootloader.bin` — 引导程序
+   - `partition-table.bin` — 分区表
+   - `esp32_esurfing.bin` — 应用程序
+   - `spiffs.bin` — SPIFFS 配置分区
+3. 使用 USB 数据线连接开发板到电脑
+4. 打开设备管理器确认串口号（如 COM3、COM14）
 
 ### 烧录步骤
 
 **1. 打开 Flash Download Tool**
 
-启动 `flash_download_tool_x.x.x.exe`，选择芯片类型：
+启动 `flash_download_tool_x.x.x.exe`，根据芯片型号选择：
 
-- **Chip Type**: `ESP32-C3`
-- **Load Mode**: `UART`
-- 点击 **OK**
+| 你的芯片 | Chip Type 选择 |
+|----------|---------------|
+| ESP32-C3 SuperMini / ESP32-C3 | **ESP32-C3** |
+| ESP32-S3 | **ESP32-S3** |
+| ESP32 | **ESP32** |
+| ESP32-S2 | **ESP32-S2** |
+
+Load Mode 选择 **UART**，点击 **OK**。
 
 **2. 配置烧录参数**
 
-在每个固件行的输入框中填写：
+在所有 4 个固件行的输入框中填入地址和文件路径：
 
-| Address | File | 说明 |
-|---------|------|------|
-| `0x0` | `bootloader.bin` | 引导程序 |
-| `0x8000` | `partition-table.bin` | 分区表 |
-| `0x10000` | `esp32_esurfing.bin` | 应用程序 |
-| `0x2D0000` | `spiffs.bin` | 配置文件分区 |
+| Address | File |
+|---------|------|
+| `0x0` | `bootloader.bin` |
+| `0x8000` | `partition-table.bin` |
+| `0x10000` | `esp32_esurfing.bin` |
+| `0x2D0000` | `spiffs.bin` |
 
-底部烧录参数设置：
+底部参数设置（所有芯片统一）：
 
 | 参数 | 值 |
 |------|-----|
 | SPI SPEED | `80MHz` |
-| SPI MODE | `DIO` |
+| SPI MODE | `DIO`（ESP32-C3） / `QIO`（ESP32/ESP32-S3） |
 | FLASH SIZE | `4MB` |
-| COM | 选择实际的串口号（如 COM14） |
+| COM | 你的串口号 |
 | BAUD | `460800` |
+
+> SPI MODE: ESP32-C3 只能用 DIO，ESP32/ESP32-S3 可尝试 QIO 速度更快。
 
 **3. 开始烧录**
 

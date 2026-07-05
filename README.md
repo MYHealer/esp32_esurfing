@@ -196,12 +196,22 @@ Load Mode 选择 **UART**，点击 **OK**。
 | 参数 | 值 |
 |------|-----|
 | SPI SPEED | `80MHz` |
-| SPI MODE | `DIO`（ESP32-C3） / `QIO`（ESP32/ESP32-S3） |
+| SPI MODE | `DIO`（ESP32-C3系列） / `QIO`（ESP32/ESP32-S3/ESP32-S2） |
 | FLASH SIZE | `4MB` |
 | COM | 你的串口号 |
 | BAUD | `460800` |
 
-> SPI MODE: ESP32-C3 只能用 DIO，ESP32/ESP32-S3 可尝试 QIO 速度更快。
+**4. 按芯片型号填写正确的烧录地址**
+
+| 文件 | ESP32-C3 / C3 SuperMini | ESP32 / ESP32-S3 / ESP32-S2 |
+|------|------------------------|-----------------------------|
+| `bootloader.bin` | **`0x0`** | **`0x1000`** |
+| `partition-table.bin` | `0x8000` | `0x8000` |
+| `esp32_esurfing.bin` | `0x10000` | `0x10000` |
+| `spiffs.bin` | `0x2D0000` | `0x2D0000` |
+
+> 注意：ESP32/ESP32-S3/ESP32-S2 的 bootloader 地址是 `0x1000`，不是 `0x0`。
+> 写错地址会导致无法启动。ESP32-C3 系列用 `0x0`。
 
 **3. 开始烧录**
 

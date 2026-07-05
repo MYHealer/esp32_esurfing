@@ -98,7 +98,7 @@ int sim_thread_detach(sim_thread_t* thread)
 
 uint64_t sim_thread_cur_id(void)
 {
-    return (uint64_t)xTaskGetCurrentTaskHandle();
+    return (uint64_t)(uintptr_t)xTaskGetCurrentTaskHandle();
 }
 
 void sim_thread_destroy(sim_thread_t* thread)

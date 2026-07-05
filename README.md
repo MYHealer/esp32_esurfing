@@ -61,7 +61,10 @@
 | **ESP32-S2** | ESP32-S2-Saola-1, S2-Mini | Xtensa 单核 | 原生 USB, 无蓝牙 |
 | **ESP32-C3 SuperMini** | C3 SuperMini 专用版 | RISC-V 单核 | 已降功率适配 PCB 天线 |
 
-> 所有版本均需要 **4MB Flash**。不支持 2MB Flash 的 ESP32-C2 芯片。
+> ⚠️ **ESP32 系列芯片仅支持 2.4GHz WiFi，不支持 5GHz。**
+> 路由共享的网络必须是 2.4g WiFi，否则设备搜不到信号。
+>
+> 所有版本均需要 **4MB Flash**。不支持 2MB Flash 的 ESP32-C2。
 > 
 > 固件可在 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载，选择对应芯片的 zip 包。
 
@@ -107,7 +110,7 @@ esptool --port COM14 --baud 460800 write_flash ^
 
 1. 开发板上电后，手机搜索 WiFi `ESurfing-Config`（无密码）
 2. 连接后浏览器打开 `http://192.168.4.1`
-3. 填写 2.4g WiFi 名称、密码，校园网账号密码，点击保存
+3. 填写 2.4g WiFi 名称、密码（设备不支持 5g WiFi），校园网账号密码，点击保存
 4. 设备自动重启并开始认证
 
 ## 自行构建
@@ -259,8 +262,8 @@ Load Mode 选择 **UART**，点击 **OK**。
 
 | 字段 | 说明 | 示例 |
 |------|------|------|
-| WiFi SSID | 2.4g WiFi 名称 | `ChinaNet` |
-| WiFi 密码 | 校园网 WiFi 密码 | 可留空 |
+| WiFi SSID | 2.4g WiFi 名称（不支持 5g） | `ChinaNet` |
+| WiFi 密码 | 2.4g WiFi 密码 | 可留空 |
 | 用户名 | 校园网账号 | 学号或手机号 |
 | 密码 | 校园网密码 |  |
 | 通道 | 认证类型 | `phone`（手机）或 `pc`（电脑） |
@@ -316,6 +319,7 @@ esp32_esurfing/
 ### WiFi 连不上
 
 - ESP32-C3 SuperMini PCB 天线信号较弱，确保靠近路由器
+- **ESP32 全系列不支持 5g WiFi**，请确认路由器开启了 2.4g 频段
 - 已在代码中降低 TX 功率（8.5 dBm），如仍不稳定可尝试 `esp_wifi_set_max_tx_power(28)`
 - 确认 WiFi 密码正确，开放网络留空
 

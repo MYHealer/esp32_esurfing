@@ -1,0 +1,16 @@
+menu "ESurfingClient 配置"
+
+    config ESURF_WIFI_SSID
+        string "WiFi SSID (校园网名称)"
+        default "ChinaNet"
+        help
+            输入要连接的天翼校园网 WiFi SSID。
+
+    config ESURF_WIFI_PASSWORD
+        string "WiFi 密码"
+        default ""
+        help
+            输入校园网 WiFi 密码。
+            如为开放网络 (无密码), 留空即可。
+
+endmenu

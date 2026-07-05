@@ -1,0 +1,14 @@
+build/
+sdkconfig
+sdkconfig.old
+.claude/
+.vscode/
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
+*.pyc
+__pycache__/
+*.o
+*.obj
+*.elf
+*.map

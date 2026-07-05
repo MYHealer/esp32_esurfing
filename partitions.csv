@@ -1,0 +1,6 @@
+# ESP32-C3 4MB flash partition table
+# Factory app + SPIFFS for config
+nvs,      data, nvs,     0x9000,  0x6000,
+phy_init, data, phy,     0xf000,  0x1000,
+factory,  app,  factory, 0x10000, 0x2C0000,
+spiffs,   data, spiffs,  0x2D0000,0x130000,

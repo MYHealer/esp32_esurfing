@@ -1,0 +1,22 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "wifi_manager.c"
+        "web_config.c"
+    INCLUDE_DIRS
+        "."
+        "../components/esurfing_core/inc/utils"
+    REQUIRES
+        nvs_flash
+        esp_wifi
+        esp_event
+        esp_netif
+        esp_timer
+        log
+        lwip
+        esp_http_client
+        esp_http_server
+        mbedtls
+        esurfing_core
+        spiffs
+)

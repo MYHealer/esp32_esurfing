@@ -1,0 +1,12 @@
+{
+   "enabled": true,
+   "log_lv": 4,
+   "accounts": [
+       {
+           "username": "3123002626",
+           "password": "03157733",
+           "channel": "phone",
+           "mark": ""
+       }
+   ]
+}

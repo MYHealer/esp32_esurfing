@@ -131,6 +131,91 @@ python -m esptool --port COM14 --baud 460800 write_flash ^
 - `build_v55.py` — Windows 构建脚本（自动配置 IDF v5.5 环境）
 - `build.py` — IDF v6.0 + esp-clang 构建（备选，WiFi 兼容性较差）
 
+## 使用 Flash Download Tool 烧录
+
+> [Flash Download Tool](https://www.espressif.com/en/support/download/other-tools) 是乐鑫官方的 Windows GUI 烧录工具，适合不熟悉命令行的用户。
+
+### 准备工作
+
+1. 下载并安装 [Flash Download Tool](https://www.espressif.com/en/support/download/other-tools)（ESP32 版本）
+2. 下载固件文件（从 Releases 或自行构建）：
+   - `bootloader.bin` — 引导程序（21KB）
+   - `partition-table.bin` — 分区表（3KB）
+   - `esp32_esurfing.bin` — 应用程序（1041KB）
+   - `spiffs.bin` — SPIFFS 配置分区（1216KB）
+3. 使用 USB 数据线连接 ESP32-C3 SuperMini 到电脑
+
+### 烧录步骤
+
+**1. 打开 Flash Download Tool**
+
+启动 `flash_download_tool_x.x.x.exe`，选择芯片类型：
+
+- **Chip Type**: `ESP32-C3`
+- **Load Mode**: `UART`
+- 点击 **OK**
+
+**2. 配置烧录参数**
+
+在每个固件行的输入框中填写：
+
+| Address | File | 说明 |
+|---------|------|------|
+| `0x0` | `bootloader.bin` | 引导程序 |
+| `0x8000` | `partition-table.bin` | 分区表 |
+| `0x10000` | `esp32_esurfing.bin` | 应用程序 |
+| `0x2D0000` | `spiffs.bin` | 配置文件分区 |
+
+底部烧录参数设置：
+
+| 参数 | 值 |
+|------|-----|
+| SPI SPEED | `80MHz` |
+| SPI MODE | `DIO` |
+| FLASH SIZE | `4MB` |
+| COM | 选择实际的串口号（如 COM14） |
+| BAUD | `460800` |
+
+**3. 开始烧录**
+
+- 勾选所有 4 个固件前面的 **√** 复选框
+- 点击 **START** 按钮
+- 等待进度条完成（约 10-15 秒）
+- 状态显示 **FINISH** 即烧录完成
+
+**4. 上电运行**
+
+- 烧录完成后，按一下开发板的 **RST** 按钮（或重新上电）
+- ESP32 会自动启动，手机搜索到 `ESurfing-Config` WiFi
+
+### 烧录界面参考图
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Flash Download Tool  (ESP32-C3 + UART)              │
+├──────────────────────────────────────────────────────┤
+│  [√] bootloader.bin         ──  0x0                  │
+│  [√] partition-table.bin    ──  0x8000               │
+│  [√] esp32_esurfing.bin     ──  0x10000              │
+│  [√] spiffs.bin             ──  0x2D0000             │
+│                                                      │
+│  SPI SPEED:  80MHz   ├───  SPI MODE:  DIO  ├──       │
+│  FLASH SIZE: 4MB     ├───  COM:  COM14    ├──       │
+│  BAUD:       460800  ├───                     │       │
+│                                                      │
+│  [Erase] [Com (x)]  [START]  [STOP]                  │
+│                                                      │
+│  Status: FINISH                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+### 注意事项
+
+- **不要勾选** `DoNotChkBin` 或跳过校验，否则可能烧录后无法启动
+- **先擦除再烧录**：如遇到旧数据干扰，先点 `Erase` 擦除全部 Flash，再重新烧录
+- **USB 线必须是数据线**：充电线无法烧录
+- **Windows 驱动**：ESP32-C3 SuperMini 使用内置 USB-Serial-JTAG，Win10/Win11 自动识别，无需额外驱动
+
 ## 配置说明
 
 ### Web 后台

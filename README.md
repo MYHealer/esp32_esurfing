@@ -57,6 +57,7 @@
 |------|-----------|------|------|
 | **ESP32** | ESP32-DevKitC, NodeMCU-32S, ESP-WROOM-32 | Xtensa 双核 | 最经典，市场保有量最大 |
 | **ESP32-S3** | ESP32-S3-DevKitC-1, S3-Box, T-Display-S3 | Xtensa 双核 | USB-OTG, 大 RAM, AI 加速 |
+| **ESP32-S31** | ESP32-S31-DevKitC | RISC-V 单核 | 最新款，性能更强 |
 | **ESP32-C3** | ESP32-C3-DevKitC-02, C3 SuperMini | RISC-V 单核 | 低成本, RISC-V 架构 |
 | **ESP32-S2** | ESP32-S2-Saola-1, S2-Mini | Xtensa 单核 | 原生 USB, 无蓝牙 |
 | **ESP32-C3 SuperMini** | C3 SuperMini 专用版 | RISC-V 单核 | 已降功率适配 PCB 天线 |
@@ -206,15 +207,15 @@ Load Mode 选择 **UART**，点击 **OK**。
 
 **4. 按芯片型号填写正确的烧录地址**
 
-| 文件 | ESP32-C3 / C3 SuperMini | ESP32 / ESP32-S3 / ESP32-S2 |
-|------|------------------------|-----------------------------|
-| `bootloader.bin` | **`0x0`** | **`0x1000`** |
-| `partition-table.bin` | `0x8000` | `0x8000` |
-| `esp32_esurfing.bin` | `0x10000` | `0x10000` |
-| `spiffs.bin` | `0x2D0000` | `0x2D0000` |
+| 文件 | ESP32-C3 系列 | **ESP32-S31** | ESP32 / ESP32-S3 / ESP32-S2 |
+|------|-------------|--------------|-----------------------------|
+| `bootloader.bin` | **`0x0`** | **`0x2000`** | **`0x1000`** |
+| `partition-table.bin` | `0x8000` | `0x8000` | `0x8000` |
+| `esp32_esurfing.bin` | `0x10000` | `0x10000` | `0x10000` |
+| `spiffs.bin` | `0x2D0000` | `0x2D0000` | `0x2D0000` |
 
-> 注意：ESP32/ESP32-S3/ESP32-S2 的 bootloader 地址是 `0x1000`，不是 `0x0`。
-> 写错地址会导致无法启动。ESP32-C3 系列用 `0x0`。
+> 注意：各芯片 bootloader 地址不同。ESP32-C3/SuperMini 用 `0x0`，ESP32-S31 用 `0x2000`，ESP32/ESP32-S3/ESP32-S2 用 `0x1000`。
+> 写错地址会导致无法启动。
 
 **3. 开始烧录**
 

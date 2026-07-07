@@ -25,6 +25,14 @@ VARIANTS = [
         "extra_sdk": [],
     },
     {
+        "id": "ESP32-C3 SuperMini",
+        "target": "esp32c3",
+        "tc": "riscv",
+        "desc": "ESP32-C3 SuperMini (RISC-V, 已降功率配PCB天线)",
+        "supermini": True,
+        "extra_sdk": [],
+    },
+    {
         "id": "ESP32-S3",
         "target": "esp32s3",
         "tc": "xtensa",

@@ -53,21 +53,58 @@
 
 本项目已编译固件适配以下芯片，覆盖市面上绝大多数 ESP32 开发板：
 
-| 芯片 | 常见开发板 | 架构 | 特点 |
-|------|-----------|------|------|
-| **ESP32** | ESP32-DevKitC, NodeMCU-32S, ESP-WROOM-32 | Xtensa 双核 | 最经典，市场保有量最大 |
-| **ESP32-S3** | ESP32-S3-DevKitC-1, S3-Box, T-Display-S3 | Xtensa 双核 | USB-OTG, 大 RAM, AI 加速 |
-| **ESP32-S31** | ESP32-S31-DevKitC | RISC-V 单核 | 最新款，性能更强 |
-| **ESP32-C3** | ESP32-C3-DevKitC-02, C3 SuperMini | RISC-V 单核 | 低成本, RISC-V 架构 |
-| **ESP32-S2** | ESP32-S2-Saola-1, S2-Mini | Xtensa 单核 | 原生 USB, 无蓝牙 |
-| **ESP32-C3 SuperMini** | C3 SuperMini 专用版 | RISC-V 单核 | 已降功率适配 PCB 天线 |
+| 芯片 | 常见开发板 | 架构 | WiFi | 特点 |
+|------|-----------|------|------|------|
+| **ESP32** | ESP32-DevKitC, NodeMCU-32S, ESP-WROOM-32 | Xtensa 双核 | 2.4GHz | 最经典，市场保有量最大 |
+| **ESP32-S3** | ESP32-S3-DevKitC-1, S3-Box, T-Display-S3 | Xtensa 双核 | 2.4GHz | USB-OTG, 大 RAM, AI 加速 |
+| **ESP32-S31** | ESP32-S31-DevKitC | RISC-V 单核 | 2.4GHz | 最新款，性能更强 |
+| **ESP32-C6** | ESP32-C6-DevKitC-1, Xiao ESP32-C6 | RISC-V 单核 | 2.4GHz WiFi 6 | 新一代 WiFi 6，开发板丰富 |
+| **ESP32-C5** | ESP32-C5-DevKitC | RISC-V 单核 | **2.4GHz + 5GHz 双频 WiFi 6** | ⭐ 唯一支持 5GHz WiFi |
+| **ESP32-C61** | ESP32-C61-DevKitC-1 | RISC-V 单核 | 2.4GHz WiFi 6 | C6 升级版 |
+| **ESP32-C3** | ESP32-C3-DevKitC-02, C3 SuperMini | RISC-V 单核 | 2.4GHz | 低成本, RISC-V 架构 |
+| **ESP32-S2** | ESP32-S2-Saola-1, S2-Mini | Xtensa 单核 | 2.4GHz | 原生 USB, 无蓝牙 |
+| **ESP32-C3 SuperMini** | C3 SuperMini 专用版 | RISC-V 单核 | 2.4GHz | 已降功率适配 PCB 天线 |
 
-> ⚠️ **ESP32 系列芯片仅支持 2.4GHz WiFi，不支持 5GHz。**
-> 路由共享的网络必须是 2.4g WiFi，否则设备搜不到信号。
->
-> 所有版本均需要 **4MB Flash**。不支持 2MB Flash 的 ESP32-C2。
+> ⚠️ **WiFi 兼容性说明**
+> - ESP32 全系列（除 **ESP32-C5** 外）**仅支持 2.4GHz WiFi，不支持 5GHz**。
+> - **ESP32-C5 是唯一支持 5GHz WiFi 的芯片**（双频 2.4GHz + 5GHz），如果路由器使用 5GHz 频段可选用 C5。
+> - 所有版本均需要 **4MB Flash**。不支持 2MB Flash 的 ESP32-C2。
 > 
 > 固件可在 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载，选择对应芯片的 zip 包。
+
+## 网络拓扑与使用步骤
+
+### 典型组网
+
+```
+┌───────────────────┐      ┌─────────────────┐      ┌──────────────────┐
+│   校园网墙插       │──────│  家用路由器       │      │  ESP32 开发板    │
+│   (天翼认证)       │      │  (WAN口接校园网)  │◀────▶│  (自动认证客户端)  │
+└───────────────────┘      │  开启2.4GHz WiFi  │      │  连接路由器WiFi   │
+                           │  LAN口接电脑/设备  │      └──────────────────┘
+                           └────────┬──────────┘
+                                    │
+                           ┌────────▼──────────┐
+                           │  手机/电脑/平板    │
+                           │  连接路由器WiFi     │
+                           │  自动上网           │
+                           └───────────────────┘
+```
+
+### 使用步骤
+
+1. **连接网络** — 将家用路由器的 **WAN 口**（或 LAN 口）用网线连接到宿舍墙上的校园网接口
+2. **设置路由器 WiFi** — 进入路由器管理后台，确保 **2.4GHz WiFi 已开启**，频段设置为 2.4GHz
+   > ⚠️ 大部分 ESP32 芯片不支持 5GHz WiFi。只有 ESP32-C5 支持双频。如果路由器仅开启 5GHz，ESP32 将搜不到信号。
+3. **烧录固件** — 按下方「快速开始」中的方法，将相应芯片的固件烧录到 ESP32 开发板
+4. **配置 ESP32** — 开发板上电后：
+   - 手机搜索并连接 WiFi `ESurfing-Config`（无密码）
+   - 浏览器打开 `http://192.168.4.1`
+   - 填写 **路由器的 2.4GHz WiFi 名称和密码**
+   - 填写 **校园网账号密码**
+   - 点击保存，ESP32 自动重启
+5. **自动认证** — ESP32 会自动连接到路由器 WiFi，检测校园网 captive portal，完成认证并保持在线
+6. **全屋上网** — 认证成功后，所有连接到该路由器（WiFi/LAN）的设备均可正常上网
 
 ## 快速开始
 

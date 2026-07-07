@@ -12,6 +12,7 @@ NINJA_BIN = r"E:\ESP\.espressif\tools\ninja\1.12.1"
 TOOLCHAINS = {
     "riscv": r"C:\Users\MR\AppData\Local\Arduino15\packages\esp32\tools\esp-rv32\2601-cn\bin",
     "xtensa": r"E:\ESP\.espressif\tools\xtensa-esp-elf\esp-14.2.0_20260121\xtensa-esp-elf\bin",
+    "riscv_idf": r"E:\ESP\.espressif\tools\riscv32-esp-elf\esp-16.1.0_20260609\riscv32-esp-elf\bin",
 }
 
 VARIANTS = [
@@ -49,6 +50,33 @@ VARIANTS = [
         "supermini": False,
         "extra_sdk": [],
     },
+    {
+        "id": "ESP32-C6",
+        "target": "esp32c6",
+        "tc": "riscv_idf",
+        "desc": "ESP32-C6 (RISC-V, WiFi 6, 新一代)",
+        "supermini": False,
+        "extra_sdk": [],
+        "boot_offset": "0x0",
+    },
+    {
+        "id": "ESP32-C5",
+        "target": "esp32c5",
+        "tc": "riscv_idf",
+        "desc": "ESP32-C5 (RISC-V, WiFi 6双频)",
+        "supermini": False,
+        "extra_sdk": [],
+        "boot_offset": "0x2000",
+    },
+    {
+        "id": "ESP32-C61",
+        "target": "esp32c61",
+        "tc": "riscv_idf",
+        "desc": "ESP32-C61 (RISC-V, WiFi 6, C6升级版)",
+        "supermini": False,
+        "extra_sdk": [],
+        "boot_offset": "0x0",
+    },
 ]
 
 SDK_BASE = """CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
@@ -84,7 +112,7 @@ Baud: 460800
 
 地址     | 文件
 ---------|------------------
-0x0      | bootloader.bin
+{boot_offset} | bootloader.bin
 0x8000   | partition-table.bin
 0x10000  | esp32_esurfing.bin
 0x2D0000 | spiffs.bin
@@ -103,7 +131,10 @@ shutil.copy2(os.path.join(BASE, "main", "wifi_manager.c"),
              os.path.join(BASE, "main", "wifi_manager.c.bak"))
 
 results = {}
-for v in VARIANTS:
+targets = sys.argv[1:] if len(sys.argv) > 1 else ["all"]
+variants = [v for v in VARIANTS if "all" in targets or v["id"] in targets]
+
+for v in variants:
     print(f"\n{'='*60}")
     print(f"  {v['id']} — {v['desc']}")
     print(f"{'='*60}")
@@ -140,6 +171,7 @@ for v in VARIANTS:
         if any(kw in k.upper() for kw in ['MSYS', 'MINGW', 'MSYSTEM']):
             del env[k]
     env["IDF_PATH"] = IDF_PATH
+    env["IDF_MAINTAINER"] = "1"
     env["PATH"] = f"{os.path.dirname(PYTHON)};{TOOLCHAINS[v['tc']]};{CMAKE_BIN};{NINJA_BIN};{env.get('PATH', '')}"
 
     # set-target
@@ -189,7 +221,7 @@ for v in VARIANTS:
         for bn, bp in bins.items():
             if os.path.exists(bp):
                 z.write(bp, bn)
-        z.writestr("flash_guide.txt", FLASH_GUIDE.format(chip=v["target"].upper()))
+        z.writestr("flash_guide.txt", FLASH_GUIDE.format(chip=v["target"].upper(), boot_offset=v.get("boot_offset", "0x0")))
 
     print(f"  ✓ {zpath} ({os.path.getsize(zpath)//1024} KB)")
     results[v["id"]] = True

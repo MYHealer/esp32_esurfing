@@ -195,10 +195,6 @@ Load Mode 选择 **UART**，点击 **OK**。
 | COM | 你的串口号 |
 | BAUD | `460800` |
 
-### 烧录界面参考图
-
-![Flash Download Tool 烧录界面](flash_tool.png)
-
 **3. 按芯片型号填写正确的烧录地址**
 
 | 文件 | ESP32-C3 系列 | **ESP32-S31** | ESP32 / ESP32-S3 / ESP32-S2 |
@@ -210,6 +206,10 @@ Load Mode 选择 **UART**，点击 **OK**。
 
 > 注意：各芯片 bootloader 地址不同。ESP32-C3/SuperMini 用 `0x0`，ESP32-S31 用 `0x2000`，ESP32/ESP32-S3/ESP32-S2 用 `0x1000`。
 > 写错地址会导致无法启动。
+
+### 烧录界面参考图
+
+![Flash Download Tool 烧录界面](flash_tool.png)
 
 **4. 开始烧录**
 

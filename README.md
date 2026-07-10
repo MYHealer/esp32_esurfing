@@ -261,24 +261,7 @@ Load Mode 选择 **UART**，点击 **OK**。
 
 ### 烧录界面参考图
 
-```
-┌──────────────────────────────────────────────────────┐
-│  Flash Download Tool  (ESP32-C3 + UART)              │
-├──────────────────────────────────────────────────────┤
-│  [√] bootloader.bin         ──  0x0                  │
-│  [√] partition-table.bin    ──  0x8000               │
-│  [√] esp32_esurfing.bin     ──  0x10000              │
-│  [√] spiffs.bin             ──  0x2D0000             │
-│                                                      │
-│  SPI SPEED:  80MHz   ├───  SPI MODE:  DIO  ├──       │
-│  FLASH SIZE: 4MB     ├───  COM:  COM14    ├──       │
-│  BAUD:       460800  ├───                     │       │
-│                                                      │
-│  [Erase] [Com (x)]  [START]  [STOP]                  │
-│                                                      │
-│  Status: FINISH                                      │
-└──────────────────────────────────────────────────────┘
-```
+![Flash Download Tool 烧录界面](flash_tool.png)
 
 ### 注意事项
 

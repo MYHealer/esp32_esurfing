@@ -70,7 +70,7 @@
 > - 如果路由器开启了双频合一（2.4GHz 和 5GHz 同名），ESP32 可能无法连接。建议在路由器后台**单独开启一个 2.4GHz 专用 WiFi** 给 ESP32 使用。
 > - 所有版本均需要 **4MB Flash**。不支持 2MB Flash 的 ESP32-C2。
 > 
-> 固件可在 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载，选择对应芯片的 zip 包。
+> 固件可在 [Releases](https://gitee.com/MYHealer/esp32_esurfing/releases) 下载，选择对应芯片的 zip 包。
 
 ## 网络拓扑与使用步骤
 
@@ -107,7 +107,7 @@
 
 **③ 烧录固件到 ESP32**
 
-从 [Releases](https://github.com/MYHealer/esp32_esurfing/releases) 下载对应芯片的固件 zip 包，按下方「快速开始」中的方法烧录。
+从 [Releases](https://gitee.com/MYHealer/esp32_esurfing/releases) 下载对应芯片的固件 zip 包，按下方「快速开始」中的方法烧录。
 
 **④ 配置 ESP32**
 

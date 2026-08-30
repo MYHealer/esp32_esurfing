@@ -17,6 +17,7 @@
 #define DOMAIN_LENGTH 16
 #define AREA_LENGTH 8
 #define POST_TIMEOUT_MS 10000
+#define HTTP_MAX_BODY_SIZE (64 * 1024)  /* 64KB 响应体上限 */
 
 static const char s_generate_url[] = "http://www.msftconnecttest.com/connecttest.txt";
 static const char s_backup_generate_url[] = "http://connect.rom.miui.com/generate_204";
@@ -89,6 +90,12 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
         write_buf_t* buf = (write_buf_t*)evt->user_data;
         if (buf && evt->data && evt->data_len > 0)
         {
+            /* 防止异常响应撑爆内存 */
+            if (buf->size + evt->data_len > HTTP_MAX_BODY_SIZE)
+            {
+                LOG_WARN("响应体超过 %dKB 上限, 截断", HTTP_MAX_BODY_SIZE / 1024);
+                return ESP_FAIL;
+            }
             size_t needed = buf->size + evt->data_len + 1;
             if (needed > buf->capacity)
             {
@@ -111,6 +118,7 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             {
                 size_t vlen = strlen(evt->header_value);
                 size_t copy_len = vlen < SCHOOL_ID_LENGTH - 1 ? vlen : SCHOOL_ID_LENGTH - 1;
+                if (vlen >= SCHOOL_ID_LENGTH) LOG_WARN("SchoolId 被截断: %zu -> %zu", vlen, copy_len);
                 memcpy(s_school_id, evt->header_value, copy_len);
                 s_school_id[copy_len] = '\0';
                 LOG_INFO("School Id: %s", s_school_id);
@@ -119,6 +127,7 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             {
                 size_t vlen = strlen(evt->header_value);
                 size_t copy_len = vlen < DOMAIN_LENGTH - 1 ? vlen : DOMAIN_LENGTH - 1;
+                if (vlen >= DOMAIN_LENGTH) LOG_WARN("Domain 被截断: %zu -> %zu", vlen, copy_len);
                 memcpy(s_domain, evt->header_value, copy_len);
                 s_domain[copy_len] = '\0';
                 LOG_INFO("Domain: %s", s_domain);
@@ -127,6 +136,7 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             {
                 size_t vlen = strlen(evt->header_value);
                 size_t copy_len = vlen < AREA_LENGTH - 1 ? vlen : AREA_LENGTH - 1;
+                if (vlen >= AREA_LENGTH) LOG_WARN("Area 被截断: %zu -> %zu", vlen, copy_len);
                 memcpy(s_area, evt->header_value, copy_len);
                 s_area[copy_len] = '\0';
                 LOG_INFO("Area: %s", s_area);
@@ -180,14 +190,8 @@ static int _do_http_request(const char* url, const char* post_data, http_resp_t*
     esp_http_client_set_header(client, "Connection", "close");
     esp_http_client_set_header(client, "Accept-Encoding", "identity");
 
-    /* 计算 MD5 Checksum */
+    /* 计算 MD5 Checksum (仅 POST 需要) */
     char md5_hash_str[MAX_LEN] = {0};
-    char ua[MAX_LEN] = {0};
-    char c_id[MAX_LEN] = {0};
-    char a_id[MAX_LEN] = {0};
-    char cdc_sid[MAX_LEN] = {0};
-    char cdc_d[MAX_LEN] = {0};
-    char cdc_a[MAX_LEN] = {0};
 
     if (post_data)
     {
@@ -197,35 +201,47 @@ static int _do_http_request(const char* url, const char* post_data, http_resp_t*
             snprintf(md5_hash_str, MAX_LEN, "%s", safe_str(md5_hash));
             free(md5_hash);
         }
+        else
+        {
+            LOG_ERROR("MD5 计算失败");
+            resp->status = REQUEST_ERROR;
+            esp_http_client_cleanup(client);
+            return -1;
+        }
     }
 
     if (tl_thread_idx >= 0 && tl_thread_idx < g_prog_cnt)
     {
+        /* 公共 headers */
+        char ua[MAX_LEN] = {0};
+        char c_id[MAX_LEN] = {0};
         snprintf(ua, MAX_LEN, "%s", safe_str(g_prog_status[tl_thread_idx].login_cfg.user_agent));
         snprintf(c_id, MAX_LEN, "%s", safe_str(g_prog_status[tl_thread_idx].auth_cfg.client_id));
-        snprintf(a_id, MAX_LEN, "%s", safe_str(g_prog_status[tl_thread_idx].auth_cfg.algo_id));
-    }
-    snprintf(cdc_sid, MAX_LEN, "%s", safe_str(s_school_id));
-    snprintf(cdc_d, MAX_LEN, "%s", safe_str(s_domain));
-    snprintf(cdc_a, MAX_LEN, "%s", safe_str(s_area));
+        if (ua[0]) esp_http_client_set_header(client, "User-Agent", ua);
+        esp_http_client_set_header(client, "Accept", "text/html,text/xml,application/xhtml+xml,application/x-javascript,*/*");
+        if (c_id[0]) esp_http_client_set_header(client, "Client-ID", c_id);
 
-    /* 设置请求头 */
-    if (md5_hash_str[0])
-        esp_http_client_set_header(client, "CDC-Checksum", md5_hash_str);
-    esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
-    if (ua[0])
-        esp_http_client_set_header(client, "User-Agent", ua);
-    esp_http_client_set_header(client, "Accept", "text/html,text/xml,application/xhtml+xml,application/x-javascript,*/*");
-    if (c_id[0])
-        esp_http_client_set_header(client, "Client-ID", c_id);
-    if (a_id[0])
-        esp_http_client_set_header(client, "Algo-ID", a_id);
-    if (cdc_sid[0])
-        esp_http_client_set_header(client, "CDC-SchoolId", cdc_sid);
-    if (cdc_d[0])
-        esp_http_client_set_header(client, "CDC-Domain", cdc_d);
-    if (cdc_a[0])
-        esp_http_client_set_header(client, "CDC-Area", cdc_a);
+        /* POST 专属 headers */
+        if (post_data)
+        {
+            char a_id[MAX_LEN] = {0};
+            char cdc_sid[MAX_LEN] = {0};
+            char cdc_d[MAX_LEN] = {0};
+            char cdc_a[MAX_LEN] = {0};
+            snprintf(a_id, MAX_LEN, "%s", safe_str(g_prog_status[tl_thread_idx].auth_cfg.algo_id));
+            snprintf(cdc_sid, MAX_LEN, "%s", safe_str(s_school_id));
+            snprintf(cdc_d, MAX_LEN, "%s", safe_str(s_domain));
+            snprintf(cdc_a, MAX_LEN, "%s", safe_str(s_area));
+
+            if (md5_hash_str[0])
+                esp_http_client_set_header(client, "CDC-Checksum", md5_hash_str);
+            esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+            if (a_id[0]) esp_http_client_set_header(client, "Algo-ID", a_id);
+            if (cdc_sid[0]) esp_http_client_set_header(client, "CDC-SchoolId", cdc_sid);
+            if (cdc_d[0]) esp_http_client_set_header(client, "CDC-Domain", cdc_d);
+            if (cdc_a[0]) esp_http_client_set_header(client, "CDC-Area", cdc_a);
+        }
+    }
 
     /* 设置请求方式 */
     if (post_data)

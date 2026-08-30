@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 
 #define ESURFING_TASK_STACK_SIZE (6 * 1024)
 #define ESURFING_TASK_PRIORITY   (tskIDLE_PRIORITY + 3)
@@ -19,6 +20,7 @@ struct SimThread
     TaskHandle_t handle;
     int exit_code;
     volatile bool finished;
+    EventGroupHandle_t done_event;
 };
 
 /* 参数包裹: func + arg + 指向 SimThread 的指针 */
@@ -37,6 +39,10 @@ static void task_entry(void* pvParameters)
     thr->exit_code = ret;
     thr->finished = true;
 
+    /* 通知等待者: 任务已完成 */
+    if (thr->done_event)
+        xEventGroupSetBits(thr->done_event, 1);
+
     free(pkg);
     vTaskDelete(NULL);
 }
@@ -48,9 +54,11 @@ sim_thread_t* sim_thread_create(sim_thread_func func, void* arg)
     thread->handle = NULL;
     thread->exit_code = 0;
     thread->finished = false;
+    thread->done_event = xEventGroupCreate();
+    if (!thread->done_event) { free(thread); return NULL; }
 
     task_pkg_t* pkg = (task_pkg_t*)malloc(sizeof(task_pkg_t));
-    if (!pkg) { free(thread); return NULL; }
+    if (!pkg) { vEventGroupDelete(thread->done_event); free(thread); return NULL; }
     pkg->func = func;
     pkg->func_arg = arg;
     pkg->thread = thread;
@@ -67,6 +75,7 @@ sim_thread_t* sim_thread_create(sim_thread_func func, void* arg)
     {
         LOG_ERROR("xTaskCreate 失败: %d", ret);
         free(pkg);
+        vEventGroupDelete(thread->done_event);
         free(thread);
         return NULL;
     }
@@ -78,10 +87,9 @@ int sim_thread_join(sim_thread_t* thread, int* exit_code)
 {
     if (!thread) return -1;
 
-    /* 轮询等待任务结束 */
-    while (!thread->finished) {
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
+    /* 使用 EventGroup 阻塞等待, 零 CPU 开销 */
+    if (thread->done_event && !thread->finished)
+        xEventGroupWaitBits(thread->done_event, 1, pdFALSE, pdFALSE, portMAX_DELAY);
 
     if (exit_code) *exit_code = thread->exit_code;
     thread->handle = NULL; /* 任务已删除, 句柄无效 */
@@ -107,5 +115,7 @@ void sim_thread_destroy(sim_thread_t* thread)
     if (thread->handle) {
         /* 可以强制删除, 但风险大: vTaskDelete(thread->handle); */
     }
+    if (thread->done_event)
+        vEventGroupDelete(thread->done_event);
     free(thread);
 }

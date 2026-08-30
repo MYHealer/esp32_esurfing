@@ -13,12 +13,30 @@
 #include "nvs_flash.h"
 #include "esp_spiffs.h"
 #include "esp_err.h"
+#include "esp_sntp.h"
 
 #include "wifi_manager.h"
 #include "web_config.h"
 #include "DialerClient.h"
 
 static const char* TAG = "MAIN";
+
+static void init_sntp(void)
+{
+    ESP_LOGI(TAG, "初始化 SNTP...");
+    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "ntp.aliyun.com");
+    esp_sntp_setservername(1, "pool.ntp.org");
+    esp_sntp_init();
+    /* 等待时间同步 (最多5秒) */
+    for (int i = 0; i < 50 && esp_sntp_get_sync_status() != SNTP_SYNC_STATUS_COMPLETED; i++)
+        vTaskDelay(pdMS_TO_TICKS(100));
+    time_t now = time(NULL);
+    if (now > 1700000000)
+        ESP_LOGI(TAG, "NTP 同步完成: %lld", (long long)now);
+    else
+        ESP_LOGW(TAG, "NTP 同步超时, 时间可能不准");
+}
 
 static esp_err_t init_spiffs(void)
 {
@@ -78,6 +96,8 @@ void app_main(void)
 
     /* 等待 STA 连接并启动认证 */
     if (wifi_wait_connected(60000)) {
+        /* WiFi 已连通, 先同步时间再认证 */
+        init_sntp();
         ESP_LOGI(TAG, "STA 已连接，启动认证...");
         work();
     } else {

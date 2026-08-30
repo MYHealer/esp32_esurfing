@@ -2,10 +2,18 @@
 Usage: python build_release.py"""
 import os, sys, subprocess, shutil, zipfile
 
-BASE = r"E:\Downloads\Compressed\esp32_esurfing"
-IDF_PATH = r"E:\ESP\.espressif\v5.5.4\esp-idf"
-PYTHON = r"C:\Users\MR\.espressif\python_env\idf5.5_py3.14_env\Scripts\python.exe"
-IDF_PY = os.path.join(IDF_PATH, "tools", "idf.py")
+BASE = r"E:\ESP\esp32_esurfing"
+
+# IDF paths per version
+IDF_PATHS = {
+    "v5.5": r"E:\ESP\.espressif\v5.5.4\esp-idf",
+    "master": r"E:\ESP\.espressif\esp-idf-master",
+}
+PYTHON_ENVS = {
+    "v5.5": r"E:\ESP\.espressif\python_env\idf5.5_py3.14_env\Scripts\python.exe",
+    "master": r"E:\ESP\.espressif\python_env\idf6.2_py3.14_env\Scripts\python.exe",
+}
+
 CMAKE_BIN = r"E:\ESP\.espressif\tools\cmake\4.0.3\bin"
 NINJA_BIN = r"E:\ESP\.espressif\tools\ninja\1.12.1"
 
@@ -84,6 +92,17 @@ VARIANTS = [
         "supermini": False,
         "extra_sdk": [],
         "boot_offset": "0x0",
+    },
+    {
+        "id": "ESP32-S31",
+        "target": "esp32s31",
+        "tc": "riscv_idf",
+        "desc": "ESP32-S31 (RISC-V单核, 最新款)",
+        "supermini": False,
+        "extra_sdk": [],
+        "boot_offset": "0x2000",
+        "idf": "master",
+        "preview": True,
     },
 ]
 
@@ -173,32 +192,46 @@ for v in variants:
     with open(os.path.join(BASE, "main", "wifi_manager.c"), "w", encoding="utf-8") as f:
         f.write(wm)
 
+    # Resolve per-variant IDF version
+    idf_ver = v.get("idf", "v5.5")
+    idf_path = IDF_PATHS[idf_ver]
+    python = PYTHON_ENVS[idf_ver]
+    idf_py = os.path.join(idf_path, "tools", "idf.py")
+    preview = v.get("preview", False)
+
     # Build env
     env = os.environ.copy()
     for k in list(env.keys()):
         if any(kw in k.upper() for kw in ['MSYS', 'MINGW', 'MSYSTEM']):
             del env[k]
-    env["IDF_PATH"] = IDF_PATH
+    env["IDF_PATH"] = idf_path
     env["IDF_MAINTAINER"] = "1"
-    env["PATH"] = f"{os.path.dirname(PYTHON)};{TOOLCHAINS[v['tc']]};{CMAKE_BIN};{NINJA_BIN};{env.get('PATH', '')}"
+    if idf_ver == "master":
+        env["ESP_IDF_VERSION"] = "6.2.0"
+    env["PATH"] = f"{os.path.dirname(python)};{TOOLCHAINS[v['tc']]};{CMAKE_BIN};{NINJA_BIN};{env.get('PATH', '')}"
 
     # set-target
-    print(f"  设置目标: {v['target']}")
-    r = subprocess.run([PYTHON, IDF_PY, "-C", BASE, "set-target", v["target"]],
+    base_args = [python, idf_py, "-C", BASE]
+    if preview:
+        base_args.append("--preview")
+    set_target_args = base_args + ["set-target", v["target"]]
+    print(f"  设置目标: {v['target']} (IDF: {idf_ver}{' preview' if preview else ''})")
+    r = subprocess.run(set_target_args,
                        env=env, capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
-        print(f"  ✗ set-target 失败")
+        print(f"  [FAIL] set-target failed")
         for l in r.stderr.split('\n')[-5:]:
             if l.strip(): print(f"    {l.strip()}")
         results[v["id"]] = False
         continue
 
     # build
+    build_args = base_args + ["build"]
     print(f"  编译中...")
-    r = subprocess.run([PYTHON, IDF_PY, "-C", BASE, "build"],
+    r = subprocess.run(build_args,
                        env=env, capture_output=True, text=True, timeout=600)
     if r.returncode != 0:
-        print(f"  ✗ 编译失败")
+        print(f"  [FAIL] build failed")
         for l in r.stderr.split('\n'):
             if 'error:' in l.lower() and 'warning' not in l.lower():
                 print(f"    {l.strip()}")
@@ -231,7 +264,7 @@ for v in variants:
                 z.write(bp, bn)
         z.writestr("flash_guide.txt", FLASH_GUIDE.format(chip=v["target"].upper(), boot_offset=v.get("boot_offset", "0x0")))
 
-    print(f"  ✓ {zpath} ({os.path.getsize(zpath)//1024} KB)")
+    print(f"  [OK] {zpath} ({os.path.getsize(zpath)//1024} KB)")
     results[v["id"]] = True
 
 # Restore backup
@@ -244,4 +277,4 @@ print(f"\n{'='*60}")
 print(f"  构建结果")
 print(f"{'='*60}")
 for vid, ok in results.items():
-    print(f"  {'✓' if ok else '✗'} {vid}")
+    print(f"  {'[OK]' if ok else '[FAIL]'} {vid}")

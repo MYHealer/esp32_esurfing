@@ -17,9 +17,20 @@
 static const char* TAG = "WIFI";
 
 #define WIFI_CONNECTED_BIT  BIT0
+#define WIFI_RECONNECT_BIT  BIT1
 
 static EventGroupHandle_t s_wifi_event_group = NULL;
 static wifi_state_t s_wifi_state = WIFI_STATE_DISCONNECTED;
+static esp_event_handler_instance_t s_wifi_event_handle = NULL;
+
+/* 延迟重连任务: 避免在事件回调中阻塞 */
+static void reconnect_task(void* arg)
+{
+    vTaskDelay(pdMS_TO_TICKS(10000));
+    ESP_LOGI(TAG, "尝试重连...");
+    esp_wifi_connect();
+    vTaskDelete(NULL);
+}
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
@@ -37,8 +48,8 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         wifi_event_sta_disconnected_t* d = (wifi_event_sta_disconnected_t*)event_data;
         ESP_LOGW(TAG, "STA 断开 reason=%d, 10s 后重连", d->reason);
         s_wifi_state = WIFI_STATE_DISCONNECTED;
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        esp_wifi_connect();
+        /* 启动独立任务延迟重连, 不阻塞事件循环 */
+        xTaskCreate(reconnect_task, "wifi_reconn", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
@@ -68,14 +79,15 @@ esp_err_t wifi_init(void)
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
         IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
 
-    /* AP 配置：始终开启 */
+    /* AP 配置：始终开启，WPA2 保护 */
     wifi_config_t ap_config = {
         .ap = {
             .ssid = "ESurfing-Config",
             .ssid_len = 14,
             .channel = 6,
             .max_connection = 2,
-            .authmode = WIFI_AUTH_OPEN,
+            .authmode = WIFI_AUTH_WPA2_PSK,
+            .password = "esurfing2024",
         },
     };
 

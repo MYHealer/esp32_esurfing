@@ -69,8 +69,55 @@ static const uint8_t PC2_TAB[48] = {
 
 static const uint8_t SHIFTS[16] = {1,1,2,2,2,2,2,2,1,2,2,2,2,2,2,1};
 
-/* ---- Helper: permute bits ---- */
+/* ---- Helper: permute bits (optimized for DES table sizes) ---- */
 static inline uint64_t permute(uint64_t in, const uint8_t *tab, int inbits, int outbits) {
+    /* Fast paths for common DES permutations */
+    if (inbits == 64 && outbits == 64) {
+        /* IP or FP:64->64 */
+        uint64_t out = 0;
+        for (int i = 0; i < 64; i++) {
+            uint8_t src = tab[i];
+            out |= ((in >> (64 - src)) & 1) << (63 - i);
+        }
+        return out;
+    }
+    if (inbits == 64 && outbits == 56) {
+        /* PC1: 64->56 */
+        uint64_t out = 0;
+        for (int i = 0; i < 56; i++) {
+            uint8_t src = tab[i];
+            out |= ((in >> (64 - src)) & 1) << (55 - i);
+        }
+        return out;
+    }
+    if (inbits == 56 && outbits == 48) {
+        /* PC2: 56->48 */
+        uint64_t out = 0;
+        for (int i = 0; i < 48; i++) {
+            uint8_t src = tab[i];
+            out |= ((in >> (56 - src)) & 1) << (47 - i);
+        }
+        return out;
+    }
+    if (inbits == 32 && outbits == 48) {
+        /* E expansion: 32->48 */
+        uint64_t out = 0;
+        for (int i = 0; i < 48; i++) {
+            uint8_t src = tab[i];
+            out |= ((uint64_t)((in >> (32 - src)) & 1)) << (47 - i);
+        }
+        return out;
+    }
+    if (inbits == 32 && outbits == 32) {
+        /* P permutation: 32->32 */
+        uint32_t out = 0;
+        for (int i = 0; i < 32; i++) {
+            uint8_t src = tab[i];
+            out |= ((in >> (32 - src)) & 1) << (31 - i);
+        }
+        return out;
+    }
+    /* Generic fallback */
     uint64_t out = 0;
     for (int i = 0; i < outbits; i++) {
         out = (out << 1) | ((in >> (inbits - tab[i])) & 1);
@@ -110,10 +157,10 @@ static inline void des_keyschedule(uint32_t subkeys[32], const uint8_t key[8], i
 
 /* ---- Single DES round (Feistel) ---- */
 static inline uint32_t des_f(uint32_t R, const uint32_t sk[2]) {
-    /* Expand R to 48 bits and XOR with subkey */
+    /* Expand R to 48 bits using E permutation */
     uint64_t x = 0;
     for (int i = 0; i < 48; i++) {
-        x = (x << 1) | ((R >> (32 - E_TAB[i])) & 1);
+        x |= ((uint64_t)((R >> (32 - E_TAB[i])) & 1)) << (47 - i);
     }
     /* sk[0] holds bits 47-24, sk[1] holds bits 23-0 */
     uint64_t kval = ((uint64_t)sk[0] << 24) | sk[1];
@@ -128,10 +175,10 @@ static inline uint32_t des_f(uint32_t R, const uint32_t sk[2]) {
         out = (out << 4) | SBOX[i][row * 16 + col];
     }
 
-    /* P permutation */
+    /* P permutation: 32->32 */
     uint32_t p = 0;
     for (int i = 0; i < 32; i++) {
-        p = (p << 1) | ((out >> (32 - P_TAB[i])) & 1);
+        p |= ((out >> (32 - P_TAB[i])) & 1) << (31 - i);
     }
     return p;
 }

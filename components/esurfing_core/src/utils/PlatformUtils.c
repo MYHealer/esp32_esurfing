@@ -153,13 +153,21 @@ void get_fmt_time(char* buf, const TimeFormat fmt)
     }
 }
 
-/* ========== 随机字节 (ESP32 硬件随机数) ========== */
+/* ========== 随机字节 (ESP32 硬件随机数, 4 字节批量) ========== */
 void get_rand_bytes(uint8_t* buf, const size_t len)
 {
     if (!buf || len == 0) return;
-    for (size_t i = 0; i < len; i++)
+    size_t off = 0;
+    while (off + 4 <= len)
     {
-        buf[i] = (uint8_t)esp_random();
+        uint32_t r = esp_random();
+        memcpy(buf + off, &r, 4);
+        off += 4;
+    }
+    if (off < len)
+    {
+        uint32_t r = esp_random();
+        memcpy(buf + off, &r, len - off);
     }
 }
 

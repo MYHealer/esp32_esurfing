@@ -37,14 +37,13 @@ void refresh_states()
 
     snprintf(g_prog_status[tl_thread_idx].auth_cfg.client_id, CLIENT_ID_LEN, "%s", uuid);
 
-    /* 生成随机 host_name (20 hex chars, 即 10 bytes) */
-    uint8_t host_rnd[10];
-    get_rand_bytes(host_rnd, 10);
+    /* 生成随机 host_name (10 hex chars, 即 5 bytes, 与原版一致) */
+    uint8_t host_rnd[5];
+    get_rand_bytes(host_rnd, 5);
     host_rnd[0] &= 0xFE; /* 清除 bit 0 */
-    char host[21];
-    for (int i = 0; i < 10; i++)
-        snprintf(host + i * 2, 3, "%02x", host_rnd[i]);
-    host[20] = '\0';
+    char host[11];
+    snprintf(host, sizeof(host), "%02x%02x%02x%02x%02x",
+             host_rnd[0], host_rnd[1], host_rnd[2], host_rnd[3], host_rnd[4]);
     snprintf(g_prog_status[tl_thread_idx].auth_cfg.host_name, HOST_NAME_LEN, "%s", host);
 
     /* 生成随机 MAC 地址 */

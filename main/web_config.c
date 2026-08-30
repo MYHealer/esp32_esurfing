@@ -42,27 +42,12 @@ static const char* HTML_HEAD =
     ".btn{width:100%;padding:12px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}"
     ".btn-primary{background:#007aff;color:#fff}"
     ".btn-primary:active{background:#005bbf}"
-    ".btn-warning{background:#ff9500;color:#fff}"
-    ".btn-warning:active{background:#cc7700}"
-    ".status{text-align:center;font-size:13px;color:#888;margin-top:12px}"
-    ".status.ok{color:#34c759}"
-    ".status.err{color:#ff3b30}"
     "hr{border:none;border-top:1px solid #eee;margin:16px 0}"
     "</style></head><body>"
     "<h1>🔧 ESurfing ESP32</h1>";
 
 static const char* HTML_FOOT =
-    "<div class='card'><h2>操作</h2>"
-    "<button class='btn btn-warning' onclick='fetch(\"/restart\",{method:\"POST\"}).then(()=>alert(\"重启中...\"))'>重启设备</button>"
-    "<div class='status' id='status'>状态: <span id='status_text'>检查中...</span></div>"
-    "</div>"
-    "<script>"
-    "fetch('/status').then(r=>r.json()).then(d=>{"
-    "  let s=document.getElementById('status_text');"
-    "  if(d.connected){s.textContent='已连接 '+d.ssid+' ('+d.ip+')';s.className='ok';}"
-    "  else{s.textContent='WiFi 未连接';s.className='err';}"
-    "}).catch(()=>{document.getElementById('status_text').textContent='无法获取状态'})"
-    "</script></body></html>";
+    "</body></html>";
 
 /* ============ 配置读写 ============ */
 
@@ -248,6 +233,7 @@ static esp_err_t save_post_handler(httpd_req_t* req)
         cJSON_Delete(root);
         FILE* f = fopen("/spiffs/ESurfingClient.json", "w");
         if (f) { fwrite(json, 1, strlen(json), f); fclose(f); }
+        else { ESP_LOGE(TAG, "ESurfingClient.json 写入失败, 认证配置可能不一致"); }
         free(json);
     }
 

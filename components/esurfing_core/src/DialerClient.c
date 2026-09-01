@@ -46,17 +46,6 @@ static inline bool is_phone_channel(void)
 
 static bool load_cipher(const bytes_t zsm);
 
-/*
- * 主动续期: 在 session 过期前主动登出并重新认证
- * 默认 25 分钟, 比典型校园网 30 分钟超时提前 5 分钟
- * 可通过 menuconfig → ESurfingClient 配置 → Session 主动续期时间 调整
- */
-#ifdef CONFIG_ESURFING_SESSION_TIMEOUT_MIN
-#define SESSION_TIMEOUT_MS  ((uint64_t)CONFIG_ESURFING_SESSION_TIMEOUT_MIN * 60 * 1000)
-#else
-#define SESSION_TIMEOUT_MS  (20ULL * 60 * 1000)
-#endif
-
 static bool term()
 {
     const char* xml = create_xml_payload(TERM);
@@ -396,19 +385,6 @@ static RunStatus run()
         if (g_prog_status[tl_thread_idx].runtime_status.is_initialized &&
             g_prog_status[tl_thread_idx].runtime_status.is_authed)
         {
-            /* ---- 主动续期: session 即将过期时提前登出 ---- */
-            uint64_t session_age = get_cur_tm_ms() - g_prog_status[tl_thread_idx].auth_cfg.auth_time;
-            if (session_age >= SESSION_TIMEOUT_MS)
-            {
-                LOG_WARN("Session 已存活 %" PRIu64 "s, 超过 %" PRIu64 "s 阈值, 主动续期",
-                         session_age / 1000, SESSION_TIMEOUT_MS / 1000);
-                if (g_prog_status[tl_thread_idx].runtime_status.is_authed) term();
-                clean_session();
-                /* 下一轮 run() 将检测到 302 并触发 auth() */
-                sleep_ms(2000, false);
-                return RUN_SUCCESS;
-            }
-
             if (g_prog_status[tl_thread_idx].auth_cfg.keep_retry != 0)
             {
                 if (get_cur_tm_ms() - g_prog_status[tl_thread_idx].auth_cfg.tick >=

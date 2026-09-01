@@ -148,7 +148,7 @@ Baud: 460800
 1. 打开 Flash Download Tool → 选 {chip} → UART
 2. 按上表填入地址和文件
 3. 点 START 烧录
-4. 上电后手机搜到 WiFi "ESurfing-Config"
+4. 上电后手机搜到 WiFi "ESurfing-Config"（密码：esurfing2024）
 5. 浏览器打开 http://192.168.4.1
 6. 配置WiFi和校园网账号 → 保存 → 自动重启认证
 """
@@ -206,6 +206,7 @@ for v in variants:
             del env[k]
     env["IDF_PATH"] = idf_path
     env["IDF_MAINTAINER"] = "1"
+    env["IDF_PYTHON_ENV_PATH"] = os.path.dirname(os.path.dirname(python))
     if idf_ver == "master":
         env["ESP_IDF_VERSION"] = "6.2.0"
     env["PATH"] = f"{os.path.dirname(python)};{TOOLCHAINS[v['tc']]};{CMAKE_BIN};{NINJA_BIN};{env.get('PATH', '')}"
@@ -232,7 +233,11 @@ for v in variants:
                        env=env, capture_output=True, text=True, timeout=600)
     if r.returncode != 0:
         print(f"  [FAIL] build failed")
-        for l in r.stderr.split('\n'):
+        logp = os.path.join(OUT, f"{v['id']}_build_error.log")
+        with open(logp, "w", encoding="utf-8", errors="replace") as lf:
+            lf.write("=== STDOUT ===\n" + (r.stdout or "") + "\n=== STDERR ===\n" + (r.stderr or ""))
+        print(f"    详情: {logp}")
+        for l in (r.stdout or "").split('\n'):
             if 'error:' in l.lower() and 'warning' not in l.lower():
                 print(f"    {l.strip()}")
         results[v["id"]] = False
@@ -257,7 +262,7 @@ for v in variants:
             shutil.copy2(bp, os.path.join(vdir, bn))
 
     # Create zip
-    zpath = os.path.join(OUT, f"{v['id']}_v1.0.0.zip")
+    zpath = os.path.join(OUT, f"{v['id']}_v1.3.1.zip")
     with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
         for bn, bp in bins.items():
             if os.path.exists(bp):

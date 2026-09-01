@@ -7,7 +7,7 @@ for key in list(os.environ.keys()):
         del os.environ[key]
 
 IDF_PATH = r"E:\ESP\.espressif\v5.5.4\esp-idf"
-PROJECT_DIR = r"E:\Downloads\Compressed\esp32_esurfing"
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 IDF6_PYTHON = r"C:\Users\MR\.espressif\python_env\idf5.5_py3.14_env\Scripts\python.exe"
 RV_TOOLCHAIN = r"C:\Users\MR\AppData\Local\Arduino15\packages\esp32\tools\esp-rv32\2601-cn\bin"
 CMAKE_PATH = r"E:\ESP\.espressif\tools\cmake\4.0.3\bin"

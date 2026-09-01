@@ -1,6 +1,7 @@
 #include "utils/PlatformUtils.h"
 #include "utils/Logger.h"
 #include "States.h"
+#include "esp_wifi.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -46,13 +47,12 @@ void refresh_states()
              host_rnd[0], host_rnd[1], host_rnd[2], host_rnd[3], host_rnd[4]);
     snprintf(g_prog_status[tl_thread_idx].auth_cfg.host_name, HOST_NAME_LEN, "%s", host);
 
-    /* 生成随机 MAC 地址 */
-    uint8_t mac_rnd[6];
-    get_rand_bytes(mac_rnd, 6);
-    mac_rnd[0] &= 0xFE; /* 清除 bit 0 (locally administered) */
+    /* 读取真实 STA MAC 地址 (WIFI_IF_STA 在 IDF v5.x 和 master 均可用) */
+    uint8_t mac_raw[6] = {0};
+    esp_wifi_get_mac(WIFI_IF_STA, mac_raw);
     char mac[18];
     snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x",
-        mac_rnd[0], mac_rnd[1], mac_rnd[2], mac_rnd[3], mac_rnd[4], mac_rnd[5]);
+        mac_raw[0], mac_raw[1], mac_raw[2], mac_raw[3], mac_raw[4], mac_raw[5]);
     snprintf(g_prog_status[tl_thread_idx].auth_cfg.mac_addr, MAC_ADDR_LEN, "%s", mac);
 
     LOG_DEBUG("刷新状态: client_id=%s, host=%s, mac=%s",

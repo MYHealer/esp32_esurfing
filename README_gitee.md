@@ -323,6 +323,13 @@ esp32_esurfing/
 
 ## 更新日志
 
+### v1.0.3 (2026-09-01)
+
+- 🐛 修复 Web 保存配置后丢失：重启前 flush SPIFFS cache 到 flash
+- 🔧 心跳保活对齐 CVersion：删除自创的 25 分钟主动续期，心跳间隔完全由服务端控制
+- 🔧 S31 兼容 IDF master：`ESP_IF_WIFI_STA` → `WIFI_IF_STA`
+- 🔧 构建脚本修复：`IDF_PYTHON_ENV_PATH` 环境变量
+
 ### v1.0.2 (2026-09-01)
 
 - 🔧 修复 phone 通道"未知错误，30s 后重试"：HTTP 200 正确映射为 REQUEST_SUCCESS

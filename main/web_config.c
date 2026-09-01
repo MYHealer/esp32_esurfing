@@ -16,6 +16,7 @@
 #include "esp_http_server.h"
 #include "esp_netif.h"
 #include "esp_netif_ip_addr.h"
+#include "esp_spiffs.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -113,6 +114,19 @@ bool save_config(const app_config_t* cfg)
     fclose(f);
     free(json);
     return true;
+}
+
+/*
+ * SPIFFS 开了 cache, fclose() 只保证写进 cache, 不保证落盘。
+ * 保存后立刻 esp_restart() 会丢数据, 必须先 unmount 强制写回。
+ */
+static void flush_spiffs(void)
+{
+    esp_err_t err = esp_vfs_spiffs_unregister("spiffs");
+    if (err != ESP_OK)
+        ESP_LOGE(TAG, "SPIFFS 卸载失败: %s (配置可能未保存)", esp_err_to_name(err));
+    else
+        ESP_LOGI(TAG, "SPIFFS 已卸载, 配置已写入 flash");
 }
 
 /* ============ HTTP 处理器 ============ */
@@ -246,6 +260,7 @@ static esp_err_t save_post_handler(httpd_req_t* req)
 
     /* 延迟重启 */
     vTaskDelay(pdMS_TO_TICKS(1000));
+    flush_spiffs();
     esp_restart();
 
     return ESP_OK;
@@ -256,6 +271,7 @@ static esp_err_t restart_post_handler(httpd_req_t* req)
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "重启中...");
     vTaskDelay(pdMS_TO_TICKS(500));
+    flush_spiffs();
     esp_restart();
     return ESP_OK;
 }

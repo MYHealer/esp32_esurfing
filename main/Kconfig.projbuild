@@ -13,14 +13,4 @@ menu "ESurfingClient 配置"
             输入校园网 WiFi 密码。
             如为开放网络 (无密码), 留空即可。
 
-    config ESURFING_SESSION_TIMEOUT_MIN
-        int "Session 主动续期时间 (分钟)"
-        default 20
-        range 5 120
-        help
-            校园网单次认证的持续时间。ESP32 会在此时间到期前
-            主动登出并重新认证，避免被动掉线。
-            建议设为实际 session 超时的 80% 左右。
-            默认 20 分钟，适用于 30 分钟超时的校园网。
-
 endmenu

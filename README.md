@@ -112,7 +112,7 @@
 **④ 配置 ESP32**
 
 开发板上电后：
-1. 手机搜索并连接 WiFi `ESurfing-Config`（无密码）
+1. 手机搜索并连接 WiFi `ESurfing-Config`（密码：`esurfing2024`）
 2. 浏览器打开 `http://192.168.4.1`
 3. 在 Web 配置页面填写：
    - **WiFi SSID** → 上一步设置的**路由器的 2.4GHz WiFi 名称**
@@ -221,7 +221,7 @@ Load Mode 选择 **UART**，点击 **OK**。
 **5. 上电运行**
 
 - 烧录完成后，按一下开发板的 **RST** 按钮（或重新上电）
-- ESP32 会自动启动，手机搜索到 `ESurfing-Config` WiFi
+- ESP32 会自动启动，手机搜索到 `ESurfing-Config` WiFi（密码：`esurfing2024`）
 
 ### 注意事项
 
@@ -242,7 +242,15 @@ Load Mode 选择 **UART**，点击 **OK**。
 | 密码 | 校园网密码 |  |
 | 通道 | 认证类型 | `phone`（手机）或 `pc`（电脑） |
 
-连接 `ESurfing-Config` → 浏览器访问 `http://192.168.4.1`
+连接 `ESurfing-Config`（密码：`esurfing2024`）→ 浏览器访问 `http://192.168.4.1`
+
+### AP 热点信息
+
+| 项目 | 值 |
+|------|-----|
+| WiFi 名称 | `ESurfing-Config` |
+| 密码 | `esurfing2024` |
+| 管理页面 | `http://192.168.4.1` |
 
 ### SPIFFS 配置文件
 
@@ -307,6 +315,27 @@ esp32_esurfing/
 
 - 保存配置后设备会自动重启以应用新配置
 - 如异常重启，检查 USB 供电是否稳定
+
+## 更新日志
+
+### v1.0.2 (2026-09-01)
+
+- 🔧 修复 phone 通道"未知错误，30s 后重试"：HTTP 200 正确映射为 REQUEST_SUCCESS
+- 🔧 修复 phone 通道 Error-Code=10：client_ip 使用 wlanuserip 而非 DHCP IP
+- 🧹 清除硬编码的 WiFi 和账号配置信息
+
+### v1.0.1 (2026-09-01)
+
+- 📝 补充 AP 热点密码 `esurfing2024`（此前 README 误标为"无密码"）
+- 🔧 phone 通道 POST Content-Type 改为 `text/plain; charset=utf-8`，与 CVersion 对齐
+- 🧹 清理 phone_xxtea.c 残留文件及引用
+
+### v1.0.0 (2026-07-05)
+
+- 🎉 首次发布，支持 ESP32 全系列芯片
+- ✅ PC 通道认证 + 心跳保活
+- ✅ Web 配置后台 (AP: ESurfing-Config)
+- ✅ 17 种加密算法移植自 CVersion
 
 ## 许可证
 

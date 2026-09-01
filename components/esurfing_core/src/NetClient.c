@@ -27,6 +27,7 @@ static char s_domain[DOMAIN_LENGTH];
 static char s_area[AREA_LENGTH];
 
 static bool s_headers_parsed = false;
+static char s_error_code[16] = {0};
 
 void reset_net_client_state(void)
 {
@@ -141,6 +142,14 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
                 s_area[copy_len] = '\0';
                 LOG_INFO("Area: %s", s_area);
             }
+            if (strcasecmp(evt->header_key, "Error-Code") == 0)
+            {
+                size_t vlen = strlen(evt->header_value);
+                size_t copy_len = vlen < sizeof(s_error_code) - 1 ? vlen : sizeof(s_error_code) - 1;
+                memcpy(s_error_code, evt->header_value, copy_len);
+                s_error_code[copy_len] = '\0';
+                LOG_INFO("Error-Code: %s", s_error_code);
+            }
             if (strcasecmp(evt->header_key, "Location") == 0)
             {
                 if (tl_thread_idx >= 0 && tl_thread_idx < g_prog_cnt)
@@ -176,6 +185,8 @@ static int _do_http_request(const char* url, const char* post_data, http_resp_t*
         .skip_cert_common_name_check = true,
         .method = post_data ? HTTP_METHOD_POST : HTTP_METHOD_GET,
         .max_redirection_count = 0,  /* 不自动跟随重定向，与原始 libcurl 行为一致 */
+        .buffer_size = 2048,  /* 增大 HTTP 头缓冲区, 默认 512 不够放 9 个自定义头 */
+        .buffer_size_tx = 2048,  /* 增大发送缓冲区 */
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
@@ -235,7 +246,11 @@ static int _do_http_request(const char* url, const char* post_data, http_resp_t*
 
             if (md5_hash_str[0])
                 esp_http_client_set_header(client, "CDC-Checksum", md5_hash_str);
-            esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+            /* phone 通道 (Android UA) 用 text/plain, pc 通道用 x-www-form-urlencoded */
+            if (strcmp(g_prog_status[tl_thread_idx].login_cfg.chn, "phone") == 0)
+                esp_http_client_set_header(client, "Content-Type", "text/plain; charset=utf-8");
+            else
+                esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
             if (a_id[0]) esp_http_client_set_header(client, "Algo-ID", a_id);
             if (cdc_sid[0]) esp_http_client_set_header(client, "CDC-SchoolId", cdc_sid);
             if (cdc_d[0]) esp_http_client_set_header(client, "CDC-Domain", cdc_d);
@@ -283,7 +298,10 @@ http_resp_t post(const char* url, const char* data)
 
     http_resp_t resp = {0};
     s_headers_parsed = false;
+    s_error_code[0] = '\0';
     _do_http_request(url, data, &resp);
+
+    snprintf(resp.error_code, sizeof(resp.error_code), "%s", s_error_code);
 
     if (resp.status == REQUEST_HAVE_RES)
         LOG_DEBUG("POST 响应: %d bytes", resp.body_size);
@@ -297,7 +315,9 @@ http_resp_t get(const char* url)
 
     http_resp_t resp = {0};
     s_headers_parsed = false;
+    s_error_code[0] = '\0';
     _do_http_request(url, NULL, &resp);
+    snprintf(resp.error_code, sizeof(resp.error_code), "%s", s_error_code);
     LOG_INFO("GET result: status=%d, body=%p, body_size=%d", resp.status, resp.body_data, resp.body_size);
     return resp;
 }
@@ -331,6 +351,16 @@ NetworkStatus check_network_status(void)
 
     NetworkStatus st = resp.status;
     if (resp.body_data) free(resp.body_data);
+
+    /* HTTP 200 (REQUEST_HAVE_RES) 表示已连接互联网 (msftconnecttest 返回 200)
+     * CVersion 用 http://223.5.5.5 返回 404→REQUEST_SUCCESS
+     * ESP32 用 msftconnecttest 返回 200→需转为 REQUEST_SUCCESS */
+    if (st == REQUEST_HAVE_RES)
+    {
+        LOG_DEBUG("check_net: HTTP 200 -> REQUEST_SUCCESS (已连接互联网)");
+        return REQUEST_SUCCESS;
+    }
+
     return st;
 }
 

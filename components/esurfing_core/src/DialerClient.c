@@ -16,6 +16,8 @@
 #include "NetClient.h"
 #include "States.h"
 
+#include "esp_netif.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -36,6 +38,13 @@ typedef enum
 } RunStatus;
 
 static const uint64_t table[] = {1, 5, 10, 20, 30};
+
+static inline bool is_phone_channel(void)
+{
+    return strcmp(g_prog_status[tl_thread_idx].login_cfg.chn, "phone") == 0;
+}
+
+static bool load_cipher(const bytes_t zsm);
 
 /*
  * 主动续期: 在 session 过期前主动登出并重新认证
@@ -87,6 +96,23 @@ static bool heartbeat()
 
     const http_resp_t result = post(g_prog_status[tl_thread_idx].auth_cfg.keep_url, encrypt);
     free(encrypt);
+
+    /* 检查 Error-Code=200 (ALGO_EXPIRED) */
+    if (strcmp(result.error_code, "200") == 0)
+    {
+        LOG_WARN("心跳 ALGO_EXPIRED, 重载 cipher");
+        if (result.body_data && result.body_size > 0)
+        {
+            const bytes_t zsm = str2bytes(result.body_data);
+            free(result.body_data);
+            bool ok = load_cipher(zsm);
+            free(zsm.data);
+            if (!ok) { LOG_ERROR("重载 cipher 失败"); return false; }
+        }
+        else { free(result.body_data); }
+        return false;  /* 调用方重试，下次用新 cipher */
+    }
+
     if (result.status != REQUEST_HAVE_RES || result.body_size == 0 || result.body_data == NULL)
     {
         LOG_ERROR("心跳响应失败");
@@ -160,33 +186,68 @@ static bool get_ticket()
     LOG_DEBUG("get_ticket 配置: %" PRIu8 ", 下标: %" PRIu8,
               g_prog_status[tl_thread_idx].login_cfg.idx, tl_thread_idx);
 
-    const char* xml = create_xml_payload(GET_TICKET);
-    if (xml == NULL) { LOG_ERROR("创建 Ticket XML 失败"); return false; }
-
-    char* encrypt = session_encrypt(xml);
-    if (encrypt == NULL) { LOG_ERROR("加密 Ticket XML 失败"); return false; }
-
-    const http_resp_t result = post(g_prog_status[tl_thread_idx].auth_cfg.ticket_url, encrypt);
-    free(encrypt);
-    if (result.status != REQUEST_HAVE_RES || result.body_size == 0 || result.body_data == NULL)
+    for (int retry = 0; retry < 3; retry++)
     {
-        LOG_ERROR("获取 Ticket 响应失败");
-        if (result.body_data) free(result.body_data);
-        return false;
+        const char* xml = create_xml_payload(GET_TICKET);
+        if (xml == NULL) { LOG_ERROR("创建 Ticket XML 失败"); return false; }
+        LOG_INFO("[get_ticket] XML(%zu)", strlen(xml));
+        /* 分段打印 XML (每段 120 字符) */
+        for (size_t off = 0; off < strlen(xml); off += 120)
+            LOG_INFO("[get_ticket] XML[%zu]: %.120s", off, xml + off);
+
+        char* encrypt = session_encrypt(xml);
+        if (encrypt == NULL) { LOG_ERROR("加密 Ticket XML 失败"); return false; }
+
+        LOG_INFO("[get_ticket] retry=%d, algo=%s, encrypt_len=%zu",
+                 retry, safe_str(g_prog_status[tl_thread_idx].auth_cfg.algo_id), strlen(encrypt));
+        LOG_INFO("[get_ticket] encrypt(hex前128): %.128s", encrypt);
+        size_t elen = strlen(encrypt);
+        if (elen > 64) LOG_INFO("[get_ticket] encrypt(hex后64): %s", encrypt + elen - 64);
+
+        const http_resp_t result = post(g_prog_status[tl_thread_idx].auth_cfg.ticket_url, encrypt);
+        free(encrypt);
+
+        LOG_INFO("[get_ticket] POST result: status=%d, error_code=%s, body_size=%d",
+                 result.status, result.error_code, result.body_size);
+
+        /* 检查 Error-Code=200 (ALGO_EXPIRED) */
+        if (strcmp(result.error_code, "200") == 0)
+        {
+            LOG_WARN("get_ticket ALGO_EXPIRED, 重载 cipher (retry=%d)", retry);
+            if (result.body_data && result.body_size > 0)
+            {
+                const bytes_t zsm = str2bytes(result.body_data);
+                free(result.body_data);
+                bool ok = load_cipher(zsm);
+                free(zsm.data);
+                if (!ok) { LOG_ERROR("重载 cipher 失败"); return false; }
+            }
+            else { free(result.body_data); }
+            continue;
+        }
+
+        if (result.status != REQUEST_HAVE_RES || result.body_size == 0 || result.body_data == NULL)
+        {
+            LOG_ERROR("获取 Ticket 响应失败 (Error-Code=%s)", result.error_code);
+            if (result.body_data) free(result.body_data);
+            return false;
+        }
+
+        char* decrypt = session_decrypt(result.body_data);
+        free(result.body_data);
+        if (decrypt == NULL) { LOG_ERROR("解密 Ticket 失败"); return false; }
+
+        char* parsed_ticket = xml_parser(decrypt, "ticket");
+        free(decrypt);
+        if (parsed_ticket == NULL) { LOG_ERROR("解析 Ticket 失败"); return false; }
+
+        snprintf(g_prog_status[tl_thread_idx].auth_cfg.ticket, TICKET_LEN, "%s", safe_str(parsed_ticket));
+        LOG_INFO("Ticket: %s", g_prog_status[tl_thread_idx].auth_cfg.ticket);
+        free(parsed_ticket);
+        return true;
     }
-
-    char* decrypt = session_decrypt(result.body_data);
-    free(result.body_data);
-    if (decrypt == NULL) { LOG_ERROR("解密 Ticket 失败"); return false; }
-
-    char* parsed_ticket = xml_parser(decrypt, "ticket");
-    free(decrypt);
-    if (parsed_ticket == NULL) { LOG_ERROR("解析 Ticket 失败"); return false; }
-
-    snprintf(g_prog_status[tl_thread_idx].auth_cfg.ticket, TICKET_LEN, "%s", safe_str(parsed_ticket));
-    LOG_INFO("Ticket: %s", g_prog_status[tl_thread_idx].auth_cfg.ticket);
-    free(parsed_ticket);
-    return true;
+    LOG_ERROR("get_ticket 重试耗尽");
+    return false;
 }
 
 static bool load_cipher(const bytes_t zsm)
@@ -289,6 +350,8 @@ static AuthStatus auth()
     snprintf(g_prog_status[tl_thread_idx].auth_cfg.ac_ip, IP_LEN, "%s", safe_str(ac_ip));
     LOG_INFO("AC IP: %s", g_prog_status[tl_thread_idx].auth_cfg.ac_ip);
     free(ac_ip);
+
+    /* client_ip(wlanuserip) 和 ac_ip 已从 portal URL 提取，与 CVersion 行为一致 */
 
     if (init_session() == false) { LOG_FATAL("初始化会话失败"); return INIT_SESSION_FAILED; }
     if (get_ticket() == false)   { LOG_FATAL("获取 Ticket 失败");   return GET_TICKET_FAILED; }

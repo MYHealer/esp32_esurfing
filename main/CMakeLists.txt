@@ -3,6 +3,7 @@ idf_component_register(
         "app_main.c"
         "wifi_manager.c"
         "web_config.c"
+        "config_codec.c"
     INCLUDE_DIRS
         "."
         "../components/esurfing_core/inc/utils"

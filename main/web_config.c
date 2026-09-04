@@ -3,6 +3,7 @@
  */
 
 #include "web_config.h"
+#include "config_codec.h"
 #include "wifi_manager.h"
 #include <string.h>
 #include <stdio.h>
@@ -99,6 +100,8 @@ bool load_config(app_config_t* cfg)
 bool save_config(const app_config_t* cfg)
 {
     cJSON* root = cJSON_CreateObject();
+    if (!root) return false;
+
     cJSON_AddStringToObject(root, "wifi_ssid", cfg->wifi_ssid);
     cJSON_AddStringToObject(root, "wifi_password", cfg->wifi_password);
     cJSON_AddStringToObject(root, "campus_username", cfg->campus_username);
@@ -107,27 +110,74 @@ bool save_config(const app_config_t* cfg)
 
     char* json = cJSON_Print(root);
     cJSON_Delete(root);
+    if (!json) return false;
 
+    bool ok = false;
     FILE* f = fopen("/spiffs/config.json", "w");
-    if (!f) { free(json); return false; }
-    fwrite(json, 1, strlen(json), f);
-    fclose(f);
+    if (f) {
+        size_t len = strlen(json);
+        ok = (fwrite(json, 1, len, f) == len);
+        /* fclose -> SPIFFS_close -> spiffs_fflush_cache, 已落盘 */
+        fclose(f);
+        if (ok) ESP_LOGI(TAG, "config.json 已保存 (%zu 字节)", len);
+    } else {
+        ESP_LOGE(TAG, "config.json 打开失败");
+    }
     free(json);
-    return true;
+    return ok;
 }
 
 /*
- * SPIFFS 开了 cache, fclose() 只保证写进 cache, 不保证落盘。
- * 保存后立刻 esp_restart() 会丢数据, 必须先 unmount 强制写回。
+ * 写入认证客户端读取的 ESurfingClient.json。
+ * 与 config.json 分开写, 任一失败都要让调用方知晓, 否则设备会带着
+ * 不一致的配置重启 (WiFi 连上了但认证用的是旧账号)。
  */
-static void flush_spiffs(void)
+static bool save_esurfing_client(const app_config_t* cfg)
 {
-    esp_err_t err = esp_vfs_spiffs_unregister("spiffs");
-    if (err != ESP_OK)
-        ESP_LOGE(TAG, "SPIFFS 卸载失败: %s (配置可能未保存)", esp_err_to_name(err));
-    else
-        ESP_LOGI(TAG, "SPIFFS 已卸载, 配置已写入 flash");
+    cJSON* root = cJSON_CreateObject();
+    if (!root) return false;
+
+    cJSON_AddBoolToObject(root, "enabled", true);
+    cJSON_AddNumberToObject(root, "log_lv", 4);
+    cJSON* accounts = cJSON_AddArrayToObject(root, "accounts");
+    cJSON* acct = cJSON_CreateObject();
+    cJSON_AddStringToObject(acct, "username", cfg->campus_username);
+    cJSON_AddStringToObject(acct, "password", cfg->campus_password);
+    cJSON_AddStringToObject(acct, "channel", cfg->channel[0] ? cfg->channel : "phone");
+    cJSON_AddStringToObject(acct, "mark", "");
+    cJSON_AddItemToArray(accounts, acct);
+
+    char* json = cJSON_Print(root);
+    cJSON_Delete(root);
+    if (!json) return false;
+
+    bool ok = false;
+    FILE* f = fopen("/spiffs/ESurfingClient.json", "w");
+    if (f) {
+        size_t len = strlen(json);
+        ok = (fwrite(json, 1, len, f) == len);
+        fclose(f);
+        if (ok) ESP_LOGI(TAG, "ESurfingClient.json 已保存");
+    } else {
+        ESP_LOGE(TAG, "ESurfingClient.json 打开失败");
+    }
+    free(json);
+    return ok;
 }
+
+/*
+ * 注意: 不要在此调用 esp_vfs_spiffs_unregister()。
+ *
+ * 1. SPIFFS_close() 内部已调用 spiffs_fflush_cache() (spiffs_hydrogen.c),
+ *    即 fclose() 本身就会把 cache 写回 flash, 无需额外 flush。
+ * 2. esp_vfs_spiffs_unregister() 会撤掉 /spiffs 的 VFS 挂载点。
+ *    若此时 HTTP 服务器仍有在途请求(或后续 handler 再访问文件),
+ *    对 /spiffs/ 下任何文件的访问都会失败, 这正是 v1.3.1
+ *    "保存后配置丢失" 的根因。
+ *
+ * 落盘由各写入点的 fclose() 保证, 如需额外保险可对每个 fd 调用 fsync(),
+ * 它映射到 SPIFFS_fflush(), 不会破坏挂载点。
+ */
 
 /* ============ HTTP 处理器 ============ */
 
@@ -138,6 +188,14 @@ static esp_err_t root_get_handler(httpd_req_t* req)
 
     const char* phone_sel = (strcmp(cfg.channel, "pc") == 0) ? "" : " selected";
     const char* pc_sel = (strcmp(cfg.channel, "pc") == 0) ? " selected" : "";
+
+    /* 转义后再嵌入 value='...': 未转义的引号会提前闭合属性,
+       导致密码含 ' 或 " 时表单显示错乱 (v1.3.1 缺陷) */
+    char ssid[256], wifi_pw[256], user[256], camp_pw[256];
+    html_escape(cfg.wifi_ssid, ssid, sizeof(ssid));
+    html_escape(cfg.wifi_password, wifi_pw, sizeof(wifi_pw));
+    html_escape(cfg.campus_username, user, sizeof(user));
+    html_escape(cfg.campus_password, camp_pw, sizeof(camp_pw));
 
     char* html = NULL;
     size_t len = asprintf(&html,
@@ -158,8 +216,7 @@ static esp_err_t root_get_handler(httpd_req_t* req)
         "</form></div>"
         "%s",
         HTML_HEAD,
-        cfg.wifi_ssid, cfg.wifi_password,
-        cfg.campus_username, cfg.campus_password,
+        ssid, wifi_pw, user, camp_pw,
         phone_sel, pc_sel,
         HTML_FOOT);
 
@@ -171,85 +228,64 @@ static esp_err_t root_get_handler(httpd_req_t* req)
     return ESP_OK;
 }
 
+/* 表单体上限。字段本身最长 64 字节, 经 URL 编码最坏放大到 3 倍
+   (%XX), 5 个字段约 960 字节 + 键名开销, 2048 留有余量。
+   v1.3.1 用 512 字节硬截断, 长 SSID/密码会静默丢失。 */
+#define FORM_BODY_MAX 2048
+
 static esp_err_t save_post_handler(httpd_req_t* req)
 {
-    char content[512] = {0};
-    int ret, remaining = req->content_len;
-    if (remaining >= (int)sizeof(content)) remaining = sizeof(content) - 1;
-    if (remaining > 0) {
-        ret = httpd_req_recv(req, content, remaining);
-        if (ret <= 0) {
-            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "读取失败");
-            return ESP_FAIL;
-        }
-        content[ret] = 0;
-    }
-
-    /* 解析表单数据 */
-    app_config_t cfg = {0};
-    strncpy(cfg.channel, "phone", sizeof(cfg.channel) - 1);
-
-    char* key = content;
-    char* val;
-    while (key && *key) {
-        char* next = strchr(key, '&');
-        if (next) { *next = 0; next++; }
-        val = strchr(key, '=');
-        if (val) {
-            *val = 0; val++;
-            /* URL 解码 (简化: 只处理 %2C 和 +) */
-            char dec[128];
-            int di = 0;
-            for (int i = 0; val[i] && di < 126; i++) {
-                if (val[i] == '+') dec[di++] = ' ';
-                else if (val[i] == '%' && val[i+1] && val[i+2]) {
-                    char hex[3] = {val[i+1], val[i+2], 0};
-                    dec[di++] = strtol(hex, NULL, 16);
-                    i += 2;
-                } else dec[di++] = val[i];
-            }
-            dec[di] = 0;
-
-            if (strcmp(key, "wifi_ssid") == 0)
-                strncpy(cfg.wifi_ssid, dec, sizeof(cfg.wifi_ssid) - 1);
-            else if (strcmp(key, "wifi_password") == 0)
-                strncpy(cfg.wifi_password, dec, sizeof(cfg.wifi_password) - 1);
-            else if (strcmp(key, "campus_username") == 0)
-                strncpy(cfg.campus_username, dec, sizeof(cfg.campus_username) - 1);
-            else if (strcmp(key, "campus_password") == 0)
-                strncpy(cfg.campus_password, dec, sizeof(cfg.campus_password) - 1);
-            else if (strcmp(key, "channel") == 0)
-                strncpy(cfg.channel, dec, sizeof(cfg.channel) - 1);
-        }
-        key = next;
-    }
-
-    if (cfg.wifi_ssid[0] == 0 || cfg.campus_username[0] == 0) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "WiFi SSID 和校园网账号不能为空");
+    /* 拒绝超大请求体, 避免在内存受限的设备上分配过多 */
+    if (req->content_len <= 0 || req->content_len > FORM_BODY_MAX) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "请求体为空或过长");
         return ESP_FAIL;
     }
 
-    save_config(&cfg);
+    char* content = calloc(1, req->content_len + 1);
+    if (!content) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "内存不足");
+        return ESP_FAIL;
+    }
+
+    /* 循环接收: httpd_req_recv 一次不一定收满 */
+    int received = 0;
+    while (received < req->content_len) {
+        int ret = httpd_req_recv(req, content + received,
+                                 req->content_len - received);
+        if (ret <= 0) {
+            free(content);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "读取失败");
+            return ESP_FAIL;
+        }
+        received += ret;
+    }
+    content[received] = '\0';
+
+    app_config_t cfg;
+    /* form_parse 会原地修改 content (分隔符替换为 \0) */
+    if (!form_parse(content, &cfg)) {
+        free(content);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                            "WiFi SSID 和校园网账号不能为空");
+        return ESP_FAIL;
+    }
+
+    if (!save_config(&cfg)) {
+        free(content);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "配置写入失败");
+        return ESP_FAIL;
+    }
 
     /* 同步写入 ESurfingClient.json (认证代码用) */
-    {
-        cJSON* root = cJSON_CreateObject();
-        cJSON_AddBoolToObject(root, "enabled", true);
-        cJSON_AddNumberToObject(root, "log_lv", 4);
-        cJSON* accounts = cJSON_AddArrayToObject(root, "accounts");
-        cJSON* acct = cJSON_CreateObject();
-        cJSON_AddStringToObject(acct, "username", cfg.campus_username);
-        cJSON_AddStringToObject(acct, "password", cfg.campus_password);
-        cJSON_AddStringToObject(acct, "channel", cfg.channel[0] ? cfg.channel : "phone");
-        cJSON_AddStringToObject(acct, "mark", "");
-        cJSON_AddItemToArray(accounts, acct);
-        char* json = cJSON_Print(root);
-        cJSON_Delete(root);
-        FILE* f = fopen("/spiffs/ESurfingClient.json", "w");
-        if (f) { fwrite(json, 1, strlen(json), f); fclose(f); }
-        else { ESP_LOGE(TAG, "ESurfingClient.json 写入失败, 认证配置可能不一致"); }
-        free(json);
+    if (!save_esurfing_client(&cfg)) {
+        free(content);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "认证配置写入失败");
+        return ESP_FAIL;
     }
+
+    free(content);
 
     /* 返回成功页面并自动重启 */
     const char* resp = "<html><head><meta charset='utf-8'><meta http-equiv='refresh' content='3'></head>"
@@ -258,9 +294,8 @@ static esp_err_t save_post_handler(httpd_req_t* req)
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_send(req, resp, strlen(resp));
 
-    /* 延迟重启 */
+    /* 给客户端留出接收响应的时间, 然后重启应用新配置 */
     vTaskDelay(pdMS_TO_TICKS(1000));
-    flush_spiffs();
     esp_restart();
 
     return ESP_OK;
@@ -271,7 +306,6 @@ static esp_err_t restart_post_handler(httpd_req_t* req)
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, "重启中...");
     vTaskDelay(pdMS_TO_TICKS(500));
-    flush_spiffs();
     esp_restart();
     return ESP_OK;
 }

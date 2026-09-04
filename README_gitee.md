@@ -323,9 +323,18 @@ esp32_esurfing/
 
 ## 更新日志
 
+### v1.3.2 (2026-09-04)
+
+- 🐛 **修复 Web 配置保存后丢失（v1.3.1 回归）**：移除 `esp_vfs_spiffs_unregister()` 调用。该调用会撤掉 `/spiffs` 的 VFS 挂载点，导致在途请求与后续文件访问失败。实际上 `SPIFFS_close()` 内部已调用 `spiffs_fflush_cache()`，`fclose()` 本身即完成落盘，无需额外 flush
+- 🐛 修复表单值含引号/尖括号导致页面显示错乱：渲染前对 HTML 属性做转义（`& < > " '`）
+- 🐛 修复长 SSID/密码被静默截断：请求体上限从 512 字节提高到 2048 字节，并改为循环接收
+- 🐛 修复配置缺失时任务死等：账号为空不再 `while(true)` 阻塞 `app_main`，改为返回错误退出，AP 与 Web 后台保持可用
+- 🔧 配置写入失败时返回 500 并提示，不再静默重启（避免带着 WiFi/认证不一致的配置启动）
+- ✅ 新增 `config_codec` 模块（HTML 转义 / URL 解码 / 表单解析）及 83 项宿主机单元测试
+
 ### v1.3.1 (2026-09-01)
 
-- 🐛 修复 Web 保存配置后丢失：重启前 flush SPIFFS cache 到 flash
+- ⚠️ **已知问题**：本版本的「flush SPIFFS」修复反而引入配置保存丢失，请升级到 v1.3.2
 - 🔧 心跳保活对齐 CVersion：删除自创的 25 分钟主动续期，心跳间隔完全由服务端控制
 - 🔧 S31 兼容 IDF master：`ESP_IF_WIFI_STA` → `WIFI_IF_STA`
 - 🔧 构建脚本修复：`IDF_PYTHON_ENV_PATH` 环境变量

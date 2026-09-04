@@ -262,7 +262,7 @@ for v in variants:
             shutil.copy2(bp, os.path.join(vdir, bn))
 
     # Create zip
-    zpath = os.path.join(OUT, f"{v['id']}_v1.3.1.zip")
+    zpath = os.path.join(OUT, f"{v['id']}_v1.3.2.zip")
     with zipfile.ZipFile(zpath, 'w', zipfile.ZIP_DEFLATED) as z:
         for bn, bp in bins.items():
             if os.path.exists(bp):

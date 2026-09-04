@@ -372,23 +372,36 @@ bool load_cfg(void)
     FILE* cfg_file = fopen(config_file, "r");
     if (!cfg_file)
     {
+        /*
+         * 不再在此处 while(true) 死等 (v1.3.1 行为)。
+         * 死循环会永久占用 app_main 任务, 使设备无法响应重配置。
+         * 返回 false, 由 DialerClient.work() 的 shut(1) 统一处理。
+         */
         LOG_ERROR("无法打开配置文件: %s", config_file);
-        LOG_INFO("创建默认配置文件, 请填写账号后重启");
+        LOG_INFO("创建默认配置文件, 请连接 AP 填写账号后重启");
         FILE* new_cfg = fopen(config_file, "w");
-        if (!new_cfg)
+        if (new_cfg)
+        {
+            fprintf(new_cfg, "%s", s_default_cfg);
+            fclose(new_cfg);
+            LOG_INFO("默认配置文件已创建, 请填写账号密码后重启设备");
+        }
+        else
         {
             LOG_FATAL("无法创建配置文件, 请检查 SPIFFS");
-            while (true) { if (g_need_exit) return false; vTaskDelay(pdMS_TO_TICKS(10000)); }
         }
-        fprintf(new_cfg, "%s", s_default_cfg);
-        fclose(new_cfg);
-        LOG_INFO("默认配置文件已创建, 请填写账号密码后重启设备");
-        while (true) { if (g_need_exit) return false; vTaskDelay(pdMS_TO_TICKS(10000)); }
+        return false;
     }
 
     fseek(cfg_file, 0, SEEK_END);
     long len = ftell(cfg_file);
     fseek(cfg_file, 0, SEEK_SET);
+    if (len <= 0)
+    {
+        LOG_FATAL("配置文件为空");
+        fclose(cfg_file);
+        return false;
+    }
 
     char* cfg_data = malloc(len + 1);
     if (!cfg_data) { fclose(cfg_file); return false; }
@@ -401,8 +414,8 @@ bool load_cfg(void)
     free(cfg_data);
     if (!cfg_json)
     {
-        LOG_FATAL("JSON 解析失败");
-        while (true) { if (g_need_exit) return false; vTaskDelay(pdMS_TO_TICKS(10000)); }
+        LOG_FATAL("JSON 解析失败, 配置文件已损坏");
+        return false;
     }
 
     const cJSON* log_lv = cJSON_GetObjectItem(cfg_json, "log_lv");
@@ -413,7 +426,7 @@ bool load_cfg(void)
     {
         LOG_WARN("程序被禁用, 请修改配置文件后重启");
         cJSON_Delete(cfg_json);
-        while (true) { if (g_need_exit) return false; vTaskDelay(pdMS_TO_TICKS(10000)); }
+        return false;
     }
     g_prog_enabled = true;
 
@@ -422,7 +435,7 @@ bool load_cfg(void)
     {
         LOG_FATAL("没有账号数据");
         cJSON_Delete(cfg_json);
-        while (true) { if (g_need_exit) return false; vTaskDelay(pdMS_TO_TICKS(10000)); }
+        return false;
     }
 
     /* ESP32 只支持单账号 (简化) */
@@ -433,9 +446,9 @@ bool load_cfg(void)
 
     if (!usr || !usr->valuestring[0] || !pwd || !pwd->valuestring[0])
     {
-        LOG_FATAL("账号或密码为空");
+        LOG_FATAL("账号或密码为空, 请连接 AP (ESurfing-Config) 配置");
         cJSON_Delete(cfg_json);
-        while (true) { if (g_need_exit) return false; vTaskDelay(pdMS_TO_TICKS(10000)); }
+        return false;
     }
 
     snprintf(g_prog_status[0].login_cfg.usr, USR_LEN, "%s", usr->valuestring);
@@ -450,7 +463,7 @@ bool load_cfg(void)
     if (strcmp(g_prog_status[0].login_cfg.chn, "pc") == 0)
         snprintf(g_prog_status[0].login_cfg.user_agent, USER_AGENT_LEN, "CCTP/Linux64/1003");
     else
-        snprintf(g_prog_status[0].login_cfg.user_agent, USER_AGENT_LEN, "CCTP/android64_vpn/2093");
+        snprintf(g_prog_status[0].login_cfg.user_agent, USER_AGENT_LEN, "CCTP/android11_64/2104");
 
     g_prog_status[0].login_cfg.idx = 1;
     g_prog_cnt = 1;

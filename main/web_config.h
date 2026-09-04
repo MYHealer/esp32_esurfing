@@ -3,17 +3,13 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
+#include "config_codec.h"
 
-/**
- * @brief 配置数据结构
+/*
+ * app_config_t 定义在 config_codec.h, 该文件不依赖 ESP-IDF,
+ * 便于在宿主机上编译单元测试 (tests/test_config_codec.c)。
+ * 此处不再重复定义, 避免两套结构体漂移。
  */
-typedef struct {
-    char wifi_ssid[32];
-    char wifi_password[64];
-    char campus_username[64];
-    char campus_password[64];
-    char channel[16];
-} app_config_t;
 
 /**
  * @brief 启动 Web 配置服务器 (端口 80)
